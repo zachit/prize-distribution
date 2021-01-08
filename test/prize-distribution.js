@@ -209,4 +209,92 @@ contract("PrizeDistribution", accounts => {
       }
     }
   );
+
+  it("should allow player to enter competition",
+    async() => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      await createCompetition(blockNumber);
+      await this.prizeDistribution.enterCompetition(2, {
+        from: accounts[0],
+        value: web3.utils.toWei("0.1")
+      });
+      const competition = await this.prizeDistribution.getCompetition.call(2);
+      assert.equal(competition[3].toNumber(), 1);
+    }
+  );
+
+  it("should not allow player to enter competition more than once",
+    async() => {
+      try {
+        await this.prizeDistribution.enterCompetition(2, {
+          from: accounts[0],
+          value: web3.utils.toWei("0.1")
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "You have already entered this competition."), true);
+      }
+    }
+  );
+
+  it("should not allow player to enter competition with incorrect fee",
+    async() => {
+      try {
+        await this.prizeDistribution.enterCompetition(2, {
+          from: accounts[1],
+          value: web3.utils.toWei("0.099")
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "You must deposit the exact entry fee in Ether."), true);
+      }
+    }
+  );
+
+  it("should not allow player to enter non-existent competition",
+    async() => {
+      try {
+        await this.prizeDistribution.enterCompetition(999, {
+          from: accounts[1],
+          value: web3.utils.toWei("0.1")
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The competition does not exist."), true);
+      }
+    }
+  );
+
+  it("should not allow player to enter canceled competition",
+    async() => {
+      try {
+        await this.prizeDistribution.enterCompetition(1, {
+          from: accounts[1],
+          value: web3.utils.toWei("0.1")
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "This competition has been canceled."), true);
+      }
+    }
+  );
+
+  it("should not allow player to enter started competition",
+    async() => {
+      try {
+        await this.prizeDistribution.enterCompetition(0, {
+          from: accounts[1],
+          value: web3.utils.toWei("0.1")
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "This competition has already started."), true);
+      }
+    }
+  );
 });

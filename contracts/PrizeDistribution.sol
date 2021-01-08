@@ -138,7 +138,7 @@ contract PrizeDistribution {
     require(!competition.canceled,
       "This competition has been canceled.");
     require(block.number < competition.startBlock,
-      "This competition has already started");
+      "This competition has already started.");
     competition.deposits[msg.sender] = msg.value;
     competition.depositCount += 1;
   }
