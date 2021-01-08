@@ -220,6 +220,9 @@ contract("PrizeDistribution", accounts => {
       });
       const competition = await this.prizeDistribution.getCompetition.call(2);
       assert.equal(competition[3].toNumber(), 1);
+      assert.equal(0.1, web3.utils.fromWei(
+        await web3.eth.getBalance(this.prizeDistribution.address)
+      ));
     }
   );
 
