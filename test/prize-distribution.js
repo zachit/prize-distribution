@@ -87,4 +87,28 @@ contract("PrizeDistribution", accounts => {
       assert.equal(count.toNumber(), 1);
     }
   );
+
+  it("should fail to cancel non-existent competition",
+    async () => {
+      try {
+        await this.prizeDistribution.cancelCompetition(999);
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The competition does not exist."), true);
+      }
+    }
+  );
+
+  it("should fail to cancel competition when not owner",
+    async () => {
+      try {
+        await this.prizeDistribution.cancelCompetition(0, {
+          from: accounts[1]
+        });
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "Only the owner of a competition can cancel it."), true);
+      }
+    }
+  );
 });
