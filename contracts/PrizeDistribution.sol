@@ -10,10 +10,6 @@ contract PrizeDistribution {
     string title;
     address owner;
     string externalReference;
-    mapping (address => uint256) deposits;
-    mapping (uint256 => uint256) prizeDistribution;
-    mapping (address => bool) prizeDistributionApproved;
-    mapping (uint256 => address) playerPositions;
     uint256 depositCount;
     uint256 distributionApprovalRate;
     uint256 entryFee;
@@ -22,12 +18,16 @@ contract PrizeDistribution {
     bool valid;
     bool prizeDistributionLocked;
     bool canceled;
+    mapping (address => uint256) deposits;
+    mapping (uint256 => uint256) prizeDistribution;
+    mapping (address => bool) prizeDistributionApproved;
+    mapping (uint256 => address) playerPositions;
   }
 
-  mapping (uint256 => Competition) competitions;
-  uint256 competitionCount = 0;
-  uint256 commissionRate;
-  uint256 commissionRateLastUpdated;
+  mapping (uint => Competition) public competitions;
+  uint256 public competitionCount = 0;
+  uint256 public commissionRate;
+  uint256 public commissionRateLastUpdated;
 
   constructor(uint256 _commissionRate) public {
     updateCommissionRate(_commissionRate);
@@ -40,6 +40,36 @@ contract PrizeDistribution {
 
   function getCommissionRate() public view returns (uint256) {
     return commissionRate;
+  }
+
+  function getCompetition(
+    uint _competitionId
+  ) public view returns (
+    string memory,
+    address,
+    string memory,
+    uint256,
+    uint256,
+    uint256,
+    uint256,
+    uint256,
+    bool,
+    bool
+  ) {
+    Competition storage competition = competitions[_competitionId];
+    require(competition.valid, "The competition does not exist.");
+    return (
+      competition.title,
+      competition.owner,
+      competition.externalReference,
+      competition.depositCount,
+      competition.distributionApprovalRate,
+      competition.entryFee,
+      competition.startBlock,
+      competition.endBlock,
+      competition.prizeDistributionLocked,
+      competition.canceled
+    );
   }
 
   function createCompetition(
@@ -61,18 +91,19 @@ contract PrizeDistribution {
     sumDistCategories = sumDistCategories.add(_distribution5);
     require(sumDistCategories == 100,
       "The prize distribution must total 100%.");
-    Competition memory competition;
-    competition.prizeDistributionLocked = false;
-    competition.valid = true;
-    competition.canceled = false;
-    competition.owner = msg.sender;
-    competition.title = _title;
-    competition.externalReference = _externalReference;
-    competition.entryFee = _entryFee;
-    competition.startBlock = _startBlock;
-    competition.endBlock = _endBlock;
-    competition.distributionApprovalRate = _distributionApprovalRate;
-    competitions[competitionCount] = competition;
+    competitions[competitionCount] = Competition({
+      title: _title,
+      owner: msg.sender,
+      depositCount: 0,
+      externalReference: _externalReference,
+      entryFee: _entryFee,
+      distributionApprovalRate: _distributionApprovalRate,
+      startBlock: _startBlock,
+      endBlock: _endBlock,
+      valid: true,
+      canceled: false,
+      prizeDistributionLocked: false
+    });
     competitions[competitionCount].prizeDistribution[0] = _distribution1;
     competitions[competitionCount].prizeDistribution[1] = _distribution2;
     competitions[competitionCount].prizeDistribution[2] = _distribution3;
