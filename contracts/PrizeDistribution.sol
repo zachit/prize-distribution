@@ -42,6 +42,10 @@ contract PrizeDistribution {
     return commissionRate;
   }
 
+  function getCompetitionCount() public view returns (uint256) {
+    return competitionCount;
+  }
+
   function getCompetition(
     uint _competitionId
   ) public view returns (
@@ -89,6 +93,7 @@ contract PrizeDistribution {
     sumDistCategories = sumDistCategories.add(_distribution3);
     sumDistCategories = sumDistCategories.add(_distribution4);
     sumDistCategories = sumDistCategories.add(_distribution5);
+    // TODO - check _distributionApprovalRate is between 0 and 100
     require(sumDistCategories == 100,
       "The prize distribution must total 100%.");
     competitions[competitionCount] = Competition({

@@ -1,4 +1,5 @@
 const PrizeDistribution = artifacts.require("PrizeDistribution");
+const _ = require("lodash");
 
 contract("PrizeDistribution", accounts => {
 
@@ -63,8 +64,27 @@ contract("PrizeDistribution", accounts => {
           new BigNumber(4)
         );
       } catch(e) {
-        assert.equal(e.reason, "The prize distribution must total 100%.");
+        assert.equal(_.includes(JSON.stringify(e),
+          "The prize distribution must total 100%."), true);
       }
+    }
+  );
+
+  it("should fail to get an invalid competition by ID",
+    async () => {
+      try {
+        await this.prizeDistribution.getCompetition(999);
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The competition does not exist."), true);
+      }
+    }
+  );
+
+  it("should get competition count",
+    async () => {
+      const count = await this.prizeDistribution.getCompetitionCount();
+      assert.equal(count.toNumber(), 1);
     }
   );
 });
