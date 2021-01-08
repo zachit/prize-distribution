@@ -5,6 +5,32 @@ contract("PrizeDistribution", accounts => {
 
   const BigNumber = web3.utils.BN;
 
+  const createCompetition = async (
+    blockNumber,
+    approvalRate,
+    distribution1,
+    distribution2,
+    distribution3,
+    distribution4,
+    distribution5,
+    startBlock,
+    endBlock
+  ) => {
+    await this.prizeDistribution.createCompetition(
+      "Vega Trading Competition",
+      "GBP/USD Feb 21",
+      web3.utils.toWei("0.1"),
+      approvalRate || approvalRate == 0 ? new BigNumber(approvalRate) : new BigNumber(66),
+      startBlock ? new BigNumber(startBlock) : new BigNumber(blockNumber + 5),
+      endBlock ? new BigNumber(endBlock) : new BigNumber(blockNumber + 10),
+      distribution1 ? new BigNumber(distribution1) : new BigNumber(45),
+      distribution2 ? new BigNumber(distribution2) : new BigNumber(30),
+      distribution3 ? new BigNumber(distribution3) : new BigNumber(15),
+      distribution4 ? new BigNumber(distribution4) : new BigNumber(7),
+      distribution5 ? new BigNumber(distribution5) : new BigNumber(3)
+    );
+  };
+
   before(async () => {
     this.prizeDistribution = await PrizeDistribution.new(web3.utils.toWei("5"));
   });
@@ -19,19 +45,7 @@ contract("PrizeDistribution", accounts => {
   it("should create a new competition",
     async() => {
       const blockNumber = await web3.eth.getBlockNumber();
-      await this.prizeDistribution.createCompetition(
-        "Vega Trading Competition",
-        "GBP/USD Feb 21",
-        web3.utils.toWei("0.1"),
-        new BigNumber(66),
-        new BigNumber(blockNumber),
-        new BigNumber(blockNumber + 10),
-        new BigNumber(45),
-        new BigNumber(30),
-        new BigNumber(15),
-        new BigNumber(7),
-        new BigNumber(3)
-      );
+      await createCompetition(blockNumber);
       const competition = await this.prizeDistribution.getCompetition.call(0);
       assert.equal(competition[0], "Vega Trading Competition");
       assert.equal(competition[1], accounts[0]);
@@ -39,7 +53,7 @@ contract("PrizeDistribution", accounts => {
       assert.equal(competition[3].toNumber(), 0);
       assert.equal(competition[4].toNumber(), 66);
       assert.equal(web3.utils.fromWei(competition[5]), 0.1);
-      assert.equal(competition[6].toNumber(), blockNumber);
+      assert.equal(competition[6].toNumber(), blockNumber + 5);
       assert.equal(competition[7].toNumber(), blockNumber + 10);
       assert.equal(competition[8], false);
       assert.equal(competition[9], false);
@@ -48,24 +62,65 @@ contract("PrizeDistribution", accounts => {
 
   it("should not create competition with invalid prize distribution",
     async () => {
-      const blockNumber = await web3.eth.getBlockNumber();
       try {
-        await this.prizeDistribution.createCompetition(
-          "Vega Trading Competition",
-          "GBP/USD Feb 21",
-          web3.utils.toWei("0.1"),
-          new BigNumber(66),
-          new BigNumber(blockNumber),
-          new BigNumber(blockNumber + 10),
-          new BigNumber(45),
-          new BigNumber(30),
-          new BigNumber(15),
-          new BigNumber(7),
-          new BigNumber(4)
-        );
+        const blockNumber = await web3.eth.getBlockNumber();
+        await createCompetition(blockNumber, null, null, null, null, null, 4);
+        assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
           "The prize distribution must total 100%."), true);
+      }
+    }
+  );
+
+  it("should not create competition with approval rate of zero",
+    async () => {
+      try {
+        const blockNumber = await web3.eth.getBlockNumber();
+        await createCompetition(blockNumber, 0, null, null, null, null, null);
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The distribution approval rate must be greater than zero."), true);
+      }
+    }
+  );
+
+  it("should not create competition with approval rate over 100",
+    async () => {
+      try {
+        const blockNumber = await web3.eth.getBlockNumber();
+        await createCompetition(blockNumber, 101, null, null, null, null, null);
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The distribution approval rate must be less than or equal to 100."), true);
+      }
+    }
+  );
+
+  it("should not create competition with start block in the past",
+    async () => {
+      try {
+        const blockNumber = await web3.eth.getBlockNumber();
+        await createCompetition(blockNumber, null, null, null, null, null, null, blockNumber - 1);
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The start block must be after the current block."), true);
+      }
+    }
+  );
+
+  it("should not create competition with end block before start block",
+    async () => {
+      try {
+        const blockNumber = await web3.eth.getBlockNumber();
+        await createCompetition(blockNumber, null, null, null, null, null, null, blockNumber + 5, blockNumber + 3);
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The end block must be after the start block."), true);
       }
     }
   );
@@ -74,6 +129,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         await this.prizeDistribution.getCompetition(999);
+        assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
           "The competition does not exist."), true);
@@ -92,6 +148,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         await this.prizeDistribution.cancelCompetition(999);
+        assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
           "The competition does not exist."), true);
@@ -105,9 +162,50 @@ contract("PrizeDistribution", accounts => {
         await this.prizeDistribution.cancelCompetition(0, {
           from: accounts[1]
         });
+        assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
           "Only the owner of a competition can cancel it."), true);
+      }
+    }
+  );
+
+  it("should fail to cancel competition when already started",
+    async () => {
+      try {
+        await this.prizeDistribution.cancelCompetition(0, {
+          from: accounts[0]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "You cannot cancel the competition because it has already started."), true);
+      }
+    }
+  );
+
+  it("should cancel competition when owner",
+    async () => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      createCompetition(blockNumber);
+      await this.prizeDistribution.cancelCompetition(1, {
+        from: accounts[0]
+      });
+      const competition = await this.prizeDistribution.getCompetition.call(1);
+      assert.equal(competition[9], true);
+    }
+  );
+
+  it("should fail to cancel competition when already canceled",
+    async () => {
+      try {
+        await this.prizeDistribution.cancelCompetition(1, {
+          from: accounts[0]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The competition has already been canceled."), true);
       }
     }
   );

@@ -93,7 +93,14 @@ contract PrizeDistribution {
     sumDistCategories = sumDistCategories.add(_distribution3);
     sumDistCategories = sumDistCategories.add(_distribution4);
     sumDistCategories = sumDistCategories.add(_distribution5);
-    // TODO - check _distributionApprovalRate is between 0 and 100
+    require(_distributionApprovalRate > 0,
+      "The distribution approval rate must be greater than zero.");
+    require(_distributionApprovalRate <= 100,
+      "The distribution approval rate must be less than or equal to 100.");
+    require(_startBlock > block.number,
+      "The start block must be after the current block.");
+    require(_endBlock > _startBlock,
+      "The end block must be after the start block.");
     require(sumDistCategories == 100,
       "The prize distribution must total 100%.");
     competitions[competitionCount] = Competition({
@@ -109,6 +116,7 @@ contract PrizeDistribution {
       canceled: false,
       prizeDistributionLocked: false
     });
+    // TODO - maybe we make this dynamic?
     competitions[competitionCount].prizeDistribution[0] = _distribution1;
     competitions[competitionCount].prizeDistribution[1] = _distribution2;
     competitions[competitionCount].prizeDistribution[2] = _distribution3;
@@ -121,11 +129,16 @@ contract PrizeDistribution {
     uint256 _competitionId
   ) public payable {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
+    require(competition.valid,
+      "The competition does not exist.");
     require(msg.value == competition.entryFee,
       "You must deposit the exact entry fee in Ether.");
     require(competition.deposits[msg.sender] == 0x0,
       "You have already entered this competition.");
+    require(!competition.canceled,
+      "This competition has been canceled.");
+    require(block.number < competition.startBlock,
+      "This competition has already started");
     competition.deposits[msg.sender] = msg.value;
     competition.depositCount += 1;
   }
