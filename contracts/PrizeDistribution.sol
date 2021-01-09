@@ -16,13 +16,15 @@ contract PrizeDistribution {
     uint256 startBlock;
     uint256 endBlock;
     bool valid;
-    bool prizeDistributionLocked;
+    bool playerRanksLocked;
     bool canceled;
     mapping (address => uint256) deposits;
     mapping (uint256 => uint256) prizeDistribution;
     mapping (address => bool) prizeDistributionApproved;
-    mapping (uint256 => address) playerPositions;
+    mapping (uint256 => address) playerRanks;
   }
+
+  uint256 MAX_PLAYERS = 50;
 
   mapping (uint => Competition) public competitions;
   uint256 public competitionCount = 0;
@@ -71,7 +73,7 @@ contract PrizeDistribution {
       competition.entryFee,
       competition.startBlock,
       competition.endBlock,
-      competition.prizeDistributionLocked,
+      competition.playerRanksLocked,
       competition.canceled
     );
   }
@@ -114,7 +116,7 @@ contract PrizeDistribution {
       endBlock: _endBlock,
       valid: true,
       canceled: false,
-      prizeDistributionLocked: false
+      playerRanksLocked: false
     });
     // TODO - maybe we make this dynamic?
     competitions[competitionCount].prizeDistribution[0] = _distribution1;
@@ -139,6 +141,8 @@ contract PrizeDistribution {
       "This competition has been canceled.");
     require(block.number < competition.startBlock,
       "This competition has already started.");
+    require(competition.depositCount < MAX_PLAYERS,
+      "This competition is already full.");
     competition.deposits[msg.sender] = msg.value;
     competition.depositCount += 1;
   }
@@ -175,12 +179,30 @@ contract PrizeDistribution {
   ) public {
     Competition storage competition = competitions[_competitionId];
     require(competition.valid, "The competition does not exist.");
-    require(competition.prizeDistributionLocked,
-      "The prize distribution has not been locked yet.");
+    require(competition.playerRanksLocked,
+      "The player ranks have not been locked yet.");
     // TODO - approve the prize distribution if the comp has ended and the sender entered the competition
   }
 
-  function withdrawPrize(
+  function submitPlayerRanks(
+    uint256 _competitionId,
+    uint256[] memory _ranks,
+    address[] memory _players
+  ) public {
+    Competition storage competition = competitions[_competitionId];
+    require(competition.valid, "The competition does not exist.");
+    require(!competition.playerRanksLocked, "The player ranks are already locked.");
+    require(_ranks.length < competition.depositCount, "The rank submitted is not valid for the competition.");
+    require(competition.endBlock < block.number, "The competition has not finished yet.");
+    require(_ranks.length == _players.length, "You must submit a rank for every player.");
+    for(uint i=0; i<_players.length; i++) {
+      require(competition.deposits[_players[i]] > 0, "You submitted a player that has not entered the competition.");
+      competitions[_competitionId].playerRanks[_ranks[i]] = _players[i];
+    }
+    competition.playerRanksLocked = true;
+  }
+
+  function withdrawPrizes(
     uint256 _competitionId
   ) public {
     Competition storage competition = competitions[_competitionId];
