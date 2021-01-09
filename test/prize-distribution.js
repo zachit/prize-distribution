@@ -354,7 +354,31 @@ contract("PrizeDistribution", accounts => {
       let competition = await this.prizeDistribution.getCompetition.call(competitionId);
       assert.equal(competition[7].toNumber(), 1);
       await timeMachine.advanceTimeAndBlock(60);
-      await this.prizeDistribution.withdrawCommission(competitionId);
+      const ownerBalanceBefore = await web3.eth.getBalance(await this.prizeDistribution.owner());
+      await this.prizeDistribution.withdrawCommission(competitionId, {
+        from: accounts[8]
+      });
+      const ownerBalanceAfter = await web3.eth.getBalance(await this.prizeDistribution.owner());
+      assert.equal(Number(web3.utils.fromWei(ownerBalanceBefore)) + 0.0005, Number(web3.utils.fromWei(ownerBalanceAfter)));
+    }
+  );
+
+  it("should not withdraw commission when already withdrawn",
+    async() => {
+      const count = await this.prizeDistribution.getCompetitionCount();
+      const competitionId = count.toNumber() - 1;
+      const ownerBalanceBefore = await web3.eth.getBalance(await this.prizeDistribution.owner());
+      try {
+        await this.prizeDistribution.withdrawCommission(competitionId, {
+          from: accounts[8]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The commission has already been paid out."), true);
+      }
+      const ownerBalanceAfter = await web3.eth.getBalance(await this.prizeDistribution.owner());
+      assert.equal(Number(web3.utils.fromWei(ownerBalanceBefore)), Number(web3.utils.fromWei(ownerBalanceAfter)));
     }
   );
 });

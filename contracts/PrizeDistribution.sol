@@ -256,7 +256,8 @@ contract PrizeDistribution is Ownable {
       "The competition has not started yet.");
     uint256 commission = competition.players.length
                           .mul(competition.entryFee)
-                          .mul(competition.commissionRate.div(1000));
+                          .mul(competition.commissionRate)
+                          .div(1000);
     address(uint160(owner())).transfer(commission);
     competition.commissionPaid = true;
   }
