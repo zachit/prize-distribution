@@ -1,8 +1,9 @@
 pragma solidity >=0.4.22 <0.9.0;
 
 import "./lib/SafeMath.sol";
+import "./lib/Ownable.sol";
 
-contract PrizeDistribution {
+contract PrizeDistribution is Ownable {
 
   using SafeMath for uint256;
 
@@ -174,21 +175,21 @@ contract PrizeDistribution {
     competitions[_competitionId].deposits[_player] = 0;
   }
 
-  function approvePrizeDistribution(
-    uint256 _competitionId
-  ) public {
-    Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
-    require(competition.playerRanksLocked,
-      "The player ranks have not been locked yet.");
-    // TODO - approve the prize distribution if the comp has ended and the sender entered the competition
-  }
+  // function approvePrizeDistribution(
+  //   uint256 _competitionId
+  // ) public {
+  //   Competition storage competition = competitions[_competitionId];
+  //   require(competition.valid, "The competition does not exist.");
+  //   require(competition.playerRanksLocked,
+  //     "The player ranks have not been locked yet.");
+  //   // TODO - approve the prize distribution if the comp has ended and the sender entered the competition
+  // }
 
   function submitPlayerRanks(
     uint256 _competitionId,
     uint256[] memory _ranks,
     address[] memory _players
-  ) public {
+  ) public onlyOwner {
     Competition storage competition = competitions[_competitionId];
     require(competition.valid, "The competition does not exist.");
     require(!competition.playerRanksLocked, "The player ranks are already locked.");
