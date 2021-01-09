@@ -8,11 +8,7 @@ contract("PrizeDistribution", accounts => {
   const createCompetition = async (
     blockNumber,
     approvalRate,
-    distribution1,
-    distribution2,
-    distribution3,
-    distribution4,
-    distribution5,
+    distribution,
     startBlock,
     endBlock
   ) => {
@@ -23,18 +19,18 @@ contract("PrizeDistribution", accounts => {
       approvalRate || approvalRate == 0 ? new BigNumber(approvalRate) : new BigNumber(66),
       startBlock ? new BigNumber(startBlock) : new BigNumber(blockNumber + 5),
       endBlock ? new BigNumber(endBlock) : new BigNumber(blockNumber + 10),
-      [
-        distribution1 ? new BigNumber(distribution1) : new BigNumber(45),
-        distribution2 ? new BigNumber(distribution2) : new BigNumber(30),
-        distribution3 ? new BigNumber(distribution3) : new BigNumber(15),
-        distribution4 ? new BigNumber(distribution4) : new BigNumber(7),
-        distribution5 ? new BigNumber(distribution5) : new BigNumber(3)
+      distribution ? distribution : [
+        new BigNumber(45),
+        new BigNumber(30),
+        new BigNumber(15),
+        new BigNumber(7),
+        new BigNumber(3)
       ]
     );
   };
 
   before(async () => {
-    this.prizeDistribution = await PrizeDistribution.new(web3.utils.toWei("5"));
+    this.prizeDistribution = await PrizeDistribution.new(web3.utils.toWei("5"), new BigNumber(2));
   });
 
   it("should init the PrizeDistribution contract correctly",
@@ -66,7 +62,13 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, null, null, null, null, null, 4);
+        await createCompetition(blockNumber, null, [
+          new BigNumber(45),
+          new BigNumber(30),
+          new BigNumber(15),
+          new BigNumber(7),
+          new BigNumber(4)
+        ]);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -75,11 +77,36 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
+  it("should not create competition prize distribution is too large",
+    async () => {
+      try {
+        const blockNumber = await web3.eth.getBlockNumber();
+        await createCompetition(blockNumber, null, [
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(10),
+          new BigNumber(9),
+          new BigNumber(1)
+        ]);
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The prize distribution cannot have more than 10 categories."), true);
+      }
+    }
+  );
+
   it("should not create competition with approval rate of zero",
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, 0, null, null, null, null, null);
+        await createCompetition(blockNumber, 0);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -92,7 +119,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, 101, null, null, null, null, null);
+        await createCompetition(blockNumber, 101);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -105,7 +132,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, null, null, null, null, null, null, blockNumber - 1);
+        await createCompetition(blockNumber, null, null, blockNumber - 1);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -118,7 +145,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, null, null, null, null, null, null, blockNumber + 5, blockNumber + 3);
+        await createCompetition(blockNumber, null, null, blockNumber + 5, blockNumber + 3);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -228,6 +255,27 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
+  it("should not allow player to enter competition when full",
+    async() => {
+      await this.prizeDistribution.enterCompetition(2, {
+        from: accounts[1],
+        value: web3.utils.toWei("0.1")
+      });
+      const competition = await this.prizeDistribution.getCompetition.call(2);
+      assert.equal(competition[3].toNumber(), 2);
+      try {
+        await this.prizeDistribution.enterCompetition(2, {
+          from: accounts[2],
+          value: web3.utils.toWei("0.1")
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "This competition is already full."), true);
+      }
+    }
+  );
+
   it("should not allow player to enter competition more than once",
     async() => {
       try {
@@ -311,14 +359,14 @@ contract("PrizeDistribution", accounts => {
         from: accounts[0],
         value: web3.utils.toWei("0.1")
       });
-      assert.equal(0.2, web3.utils.fromWei(
+      assert.equal(0.3, web3.utils.fromWei(
         await web3.eth.getBalance(this.prizeDistribution.address)
       ));
       await this.prizeDistribution.cancelCompetition(3, {
         from: accounts[0]
       });
       await this.prizeDistribution.returnEntryFee(3, accounts[0]);
-      assert.equal(0.1, web3.utils.fromWei(
+      assert.equal(0.2, web3.utils.fromWei(
         await web3.eth.getBalance(this.prizeDistribution.address)
       ));
     }

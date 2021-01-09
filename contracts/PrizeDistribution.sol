@@ -25,30 +25,48 @@ contract PrizeDistribution is Ownable {
     mapping (uint256 => address) playerRanks;
   }
 
-  uint256 MAX_PLAYERS = 50;
-
   mapping (uint => Competition) public competitions;
   uint256 public competitionCount = 0;
   uint256 public commissionRate;
   uint256 public commissionRateLastUpdated;
+  uint256 public maxPlayers;
 
-  constructor(uint256 _commissionRate) public {
+  constructor(
+    uint256 _commissionRate,
+    uint256 _maxPlayers
+  ) public {
+    maxPlayers = _maxPlayers;
     updateCommissionRate(_commissionRate);
   }
 
+  /**
+  * @dev Updates the commission rate used for competitions.
+  */
   function updateCommissionRate(uint256 _commissionRate) public {
     commissionRate = _commissionRate;
     commissionRateLastUpdated = block.number;
   }
 
+  /**
+  * @dev Returns the commission that is charged by the smart contract on
+  * competition prize pools. A number between 0 and 1000, where 1000 = 100%.
+  *
+  * The commission is redeemable by the owner of the contract.
+  */
   function getCommissionRate() public view returns (uint256) {
     return commissionRate;
   }
 
+  /**
+  * @dev Returns the count of competitions.
+  */
   function getCompetitionCount() public view returns (uint256) {
     return competitionCount;
   }
 
+  /**
+  * @dev Returns a competition by ID.
+  */
   function getCompetition(
     uint _competitionId
   ) public view returns (
@@ -79,6 +97,10 @@ contract PrizeDistribution is Ownable {
     );
   }
 
+  /**
+  * @dev Anybody can create new competitions, and they will be deemed to be
+  * the owner of the competition.
+  */
   function createCompetition(
     string memory _title,
     string memory _externalReference,
@@ -123,6 +145,11 @@ contract PrizeDistribution is Ownable {
     competitionCount += 1;
   }
 
+  /**
+   * @dev Anyone can enter a competition provided it is not full, has not
+   * already started, has not been canceled, and they pay the required
+   * entrance fee.
+   */
   function enterCompetition(
     uint256 _competitionId
   ) public payable {
@@ -137,12 +164,16 @@ contract PrizeDistribution is Ownable {
       "This competition has been canceled.");
     require(block.number < competition.startBlock,
       "This competition has already started.");
-    require(competition.depositCount < MAX_PLAYERS,
+    require(competition.depositCount < maxPlayers,
       "This competition is already full.");
     competition.deposits[msg.sender] = msg.value;
     competition.depositCount += 1;
   }
 
+  /**
+   * @dev The owner of a competition can cancel it
+   * if it has not already started.
+   */
   function cancelCompetition(
     uint256 _competitionId
   ) public {
@@ -157,6 +188,10 @@ contract PrizeDistribution is Ownable {
     competition.canceled = true;
   }
 
+  /**
+   * @dev If a competition has been canceled anybody can call this
+   * function to return the entrace fee to the original depositor.
+   */
   function returnEntryFee(
     uint256 _competitionId,
     address payable _player
@@ -170,6 +205,14 @@ contract PrizeDistribution is Ownable {
     competitions[_competitionId].deposits[_player] = 0;
   }
 
+  /**
+   * @dev The owner of the smart contract can call this function to submit
+   * the rank of each player once the competition has finished.
+   *
+   * Note: the owner does not need to necessarily be a sigle actor. The owner
+   * of the contract could be a Multisig wallet, resulting in this function
+   * performing the role of a decentralised oracle.
+   */
   function submitPlayerRanks(
     uint256 _competitionId,
     uint256[] memory _ranks,
@@ -188,6 +231,11 @@ contract PrizeDistribution is Ownable {
     competition.playerRanksLocked = true;
   }
 
+  /**
+   * @dev If the prizes of a competition have been locked by the owner, then
+   * anybody can call this function and the prizes will be distributed to
+   * the original depositors according the prize distribution and player ranks.
+   */
   function withdrawPrizes(
     uint256 _competitionId
   ) public {
@@ -196,6 +244,11 @@ contract PrizeDistribution is Ownable {
     // TODO - send the prize to the sender if they entered the competition and have not already claime their prize
   }
 
+  /**
+   * @dev Ensures that it is not possible for Ether to enter the contract
+   * unless through the context of entering a competition and paying then
+   * correct entrance fee.
+   */
   function() external payable {
     revert("You must not send Ether directly to this contract.");
   }
