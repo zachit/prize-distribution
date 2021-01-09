@@ -166,8 +166,7 @@ contract PrizeDistribution is Ownable {
   }
 
   /**
-   * @dev The owner of a competition can cancel it
-   * if it has not already started.
+   * @dev The owner of a competition can cancel it if it has not started.
    */
   function cancelCompetition(
     uint256 _competitionId
@@ -205,8 +204,9 @@ contract PrizeDistribution is Ownable {
    * the rank of each player once the competition has finished.
    *
    * Note: the owner does not need to necessarily be a sigle actor. The owner
-   * of the contract could be a Multisig wallet, resulting in this function
-   * performing the role of a decentralised oracle.
+   * of the contract could be a Multisig wallet with multiple signatories
+   * required, resulting in this function performing the role of
+   * a decentralised oracle.
    */
   function submitPlayerRanks(
     uint256 _competitionId,
