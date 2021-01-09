@@ -210,22 +210,19 @@ contract PrizeDistribution is Ownable {
    * of the contract could be a Multisig wallet with multiple signatories
    * required, resulting in this function performing the role of an oracle.
    */
-  function submitPlayerRanks(
+  function submitPlayersByRank(
     uint256 _competitionId,
-    uint256[] memory _ranks,
     address[] memory _players
   ) public competitionExists(_competitionId) onlyOwner {
     Competition storage competition = competitions[_competitionId];
-    require(_ranks.length == competition.players.length,
+    require(_players.length == competition.players.length,
       "You must submit ranks for every player in the competition.");
     require(competition.endBlock < block.number,
       "The competition has not finished yet.");
-    require(_ranks.length == _players.length,
-      "You must submit a rank for every player.");
     for(uint i=0; i<_players.length; i++) {
       require(competition.deposits[_players[i]] > 0,
         "You submitted a player that has not entered the competition.");
-      competitions[_competitionId].playerRanks[_ranks[i]] = _players[i];
+      competitions[_competitionId].playerRanks[i] = _players[i];
     }
   }
 

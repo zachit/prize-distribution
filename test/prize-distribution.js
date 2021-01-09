@@ -353,6 +353,15 @@ contract("PrizeDistribution", accounts => {
       });
       let competition = await this.prizeDistribution.getCompetition.call(competitionId);
       assert.equal(competition[7].toNumber(), 1);
+      try {
+        await this.prizeDistribution.withdrawCommission(competitionId, {
+          from: accounts[8]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The competition has not started yet."), true);
+      }
       await timeMachine.advanceTimeAndBlock(60);
       const ownerBalanceBefore = await web3.eth.getBalance(await this.prizeDistribution.owner());
       await this.prizeDistribution.withdrawCommission(competitionId, {
@@ -379,6 +388,53 @@ contract("PrizeDistribution", accounts => {
       }
       const ownerBalanceAfter = await web3.eth.getBalance(await this.prizeDistribution.owner());
       assert.equal(Number(web3.utils.fromWei(ownerBalanceBefore)), Number(web3.utils.fromWei(ownerBalanceAfter)));
+    }
+  );
+
+  it("should submit the player ranks",
+    async () => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      createCompetition(blockNumber, null, blockNumber + 3, blockNumber + 4);
+      const count = await this.prizeDistribution.getCompetitionCount();
+      const competitionId = count.toNumber() - 1;
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[0],
+        value: web3.utils.toWei("0.1")
+      });
+      let competition = await this.prizeDistribution.getCompetition.call(competitionId);
+      assert.equal(competition[7].toNumber(), 1);
+      try {
+        await this.prizeDistribution.submitPlayersByRank(competitionId, [], {
+          from: accounts[0]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "You must submit ranks for every player in the competition."), true);
+      }
+      try {
+        await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[0]], {
+          from: accounts[0]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "The competition has not finished yet."), true);
+      }
+      await timeMachine.advanceTimeAndBlock(60);
+      await timeMachine.advanceTimeAndBlock(60);
+      try {
+        await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[1]], {
+          from: accounts[0]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "You submitted a player that has not entered the competition."), true);
+      }
+      await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[0]], {
+        from: accounts[0]
+      });
     }
   );
 });
