@@ -86,16 +86,14 @@ contract PrizeDistribution is Ownable {
     uint256 _distributionApprovalRate,
     uint256 _startBlock,
     uint256 _endBlock,
-    uint256 _distribution1,
-    uint256 _distribution2,
-    uint256 _distribution3,
-    uint256 _distribution4,
-    uint256 _distribution5
+    uint256[] memory _distribution
   ) public {
-    uint256 sumDistCategories = _distribution1.add(_distribution2);
-    sumDistCategories = sumDistCategories.add(_distribution3);
-    sumDistCategories = sumDistCategories.add(_distribution4);
-    sumDistCategories = sumDistCategories.add(_distribution5);
+    uint256 sumDistribution = 0;
+    require(_distribution.length <= 10,
+      "The prize distribution cannot have more than 10 categories.");
+    for(uint256 i=0; i<_distribution.length; i++) {
+      sumDistribution = sumDistribution.add(_distribution[i]);
+    }
     require(_distributionApprovalRate > 0,
       "The distribution approval rate must be greater than zero.");
     require(_distributionApprovalRate <= 100,
@@ -104,7 +102,7 @@ contract PrizeDistribution is Ownable {
       "The start block must be after the current block.");
     require(_endBlock > _startBlock,
       "The end block must be after the start block.");
-    require(sumDistCategories == 100,
+    require(sumDistribution == 100,
       "The prize distribution must total 100%.");
     competitions[competitionCount] = Competition({
       title: _title,
@@ -119,12 +117,9 @@ contract PrizeDistribution is Ownable {
       canceled: false,
       playerRanksLocked: false
     });
-    // TODO - maybe we make this dynamic?
-    competitions[competitionCount].prizeDistribution[0] = _distribution1;
-    competitions[competitionCount].prizeDistribution[1] = _distribution2;
-    competitions[competitionCount].prizeDistribution[2] = _distribution3;
-    competitions[competitionCount].prizeDistribution[3] = _distribution4;
-    competitions[competitionCount].prizeDistribution[4] = _distribution5;
+    for(uint256 i=0; i<_distribution.length; i++) {
+      competitions[competitionCount].prizeDistribution[i] = _distribution[i];
+    }
     competitionCount += 1;
   }
 
@@ -174,16 +169,6 @@ contract PrizeDistribution is Ownable {
     _player.transfer(playerDeposit);
     competitions[_competitionId].deposits[_player] = 0;
   }
-
-  // function approvePrizeDistribution(
-  //   uint256 _competitionId
-  // ) public {
-  //   Competition storage competition = competitions[_competitionId];
-  //   require(competition.valid, "The competition does not exist.");
-  //   require(competition.playerRanksLocked,
-  //     "The player ranks have not been locked yet.");
-  //   // TODO - approve the prize distribution if the comp has ended and the sender entered the competition
-  // }
 
   function submitPlayerRanks(
     uint256 _competitionId,

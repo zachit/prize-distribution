@@ -23,11 +23,13 @@ contract("PrizeDistribution", accounts => {
       approvalRate || approvalRate == 0 ? new BigNumber(approvalRate) : new BigNumber(66),
       startBlock ? new BigNumber(startBlock) : new BigNumber(blockNumber + 5),
       endBlock ? new BigNumber(endBlock) : new BigNumber(blockNumber + 10),
-      distribution1 ? new BigNumber(distribution1) : new BigNumber(45),
-      distribution2 ? new BigNumber(distribution2) : new BigNumber(30),
-      distribution3 ? new BigNumber(distribution3) : new BigNumber(15),
-      distribution4 ? new BigNumber(distribution4) : new BigNumber(7),
-      distribution5 ? new BigNumber(distribution5) : new BigNumber(3)
+      [
+        distribution1 ? new BigNumber(distribution1) : new BigNumber(45),
+        distribution2 ? new BigNumber(distribution2) : new BigNumber(30),
+        distribution3 ? new BigNumber(distribution3) : new BigNumber(15),
+        distribution4 ? new BigNumber(distribution4) : new BigNumber(7),
+        distribution5 ? new BigNumber(distribution5) : new BigNumber(3)
+      ]
     );
   };
 
