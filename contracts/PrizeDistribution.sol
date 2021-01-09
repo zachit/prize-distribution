@@ -24,6 +24,7 @@ contract PrizeDistribution is Ownable {
     uint256 entryFee;
     uint256 startBlock;
     uint256 endBlock;
+    // uint256 stakeToPrizeRatio;
     bool valid;
     bool playerRanksLocked;
     bool canceled;
@@ -89,6 +90,7 @@ contract PrizeDistribution is Ownable {
     uint256,
     uint256,
     uint256,
+    // uint256,
     bool,
     bool
   ) {
@@ -101,6 +103,7 @@ contract PrizeDistribution is Ownable {
       competition.entryFee,
       competition.startBlock,
       competition.endBlock,
+      // competition.stakeToPrizeRatio
       competition.playerRanksLocked,
       competition.canceled
     );
@@ -114,9 +117,10 @@ contract PrizeDistribution is Ownable {
     string memory _title,
     string memory _externalReference,
     uint256 _entryFee,
-    uint256 _startBlock,
-    uint256 _endBlock,
+    uint256 _startBlock, // using instead of timestamps? I imagine a creator wanting to use
+    uint256 _endBlock,   // timestamps instead --> Find equivalent block programatically
     uint256[] memory _distribution
+    // uint256 _stakeToPrizeRatio
   ) public {
     uint256 sumDistribution = 0;
     require(_distribution.length <= 10,
@@ -130,6 +134,11 @@ contract PrizeDistribution is Ownable {
       "The end block must be after the start block.");
     require(sumDistribution == 100,
       "The prize distribution must total 100%.");
+    /** I suggest a stake pool and prize pool model
+    * uint256 stakeToPrizeRatio, 
+    * require(0 < _stakeToPrizeRatio < 1,
+    *   "stakeToPrizeRatio must be between 0 and 1, we suggest 0.66");
+    */
     competitions[competitionCount] = Competition({
       title: _title,
       owner: msg.sender,
@@ -150,7 +159,7 @@ contract PrizeDistribution is Ownable {
 
   /**
    * @dev Anyone can enter a competition provided it is not full, has not
-   * already started, has not been canceled, and they pay the required
+   * already started, has not been cancelled, and they pay the required
    * entrance fee.
    */
   function enterCompetition(
@@ -185,6 +194,13 @@ contract PrizeDistribution is Ownable {
     require(!competition.canceled,
       "The competition has already been canceled.");
     competition.canceled = true;
+    /** 
+    * can entry fees be returned in here? I can't think of a circumstance
+    * where you wouldn't want to return all fees automatically after cancelling competition
+    * perhaps is this to do with gas? 
+
+    * e.g. loop through competition.deposits and return playerDeposit to each player
+    */ 
   }
 
   /**
@@ -228,6 +244,19 @@ contract PrizeDistribution is Ownable {
     competition.playerRanksLocked = true;
   }
 
+  /** 
+   * another option for setting prize distributions, other than manually:
+   * construct a fibonacci array competition.fib for the competition that is the same length as competition.deposits
+   * sum the numbers in the competition.fib --> sumFib
+   * 
+   playerRanks = competitions[_competitionId].playerRanks
+   for(uint i=0; i<playerRanks.length; i++) {
+    uint256 prize = entry_fee * (1-stakeToPrizeRatio) * competition.fib[i] / sumFib
+    uint256 distribution = entry_fee * stakeToPrizeRatio + prize
+    playerRanks[i].transfer(distribution)
+   }
+   */
+
   /**
    * @dev If the prizes of a competition have been locked by the owner, then
    * anybody can call this function and the prizes will be distributed to
@@ -237,7 +266,7 @@ contract PrizeDistribution is Ownable {
     uint256 _competitionId
   ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
-    // TODO - send the prize to the sender if they entered the competition and have not already claime their prize
+    // TODO - send the prize to the sender if they entered the competition and have not already claimed their prize
   }
 
   /**
