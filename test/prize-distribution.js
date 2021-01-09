@@ -15,7 +15,7 @@ contract("PrizeDistribution", accounts => {
       "Vega Trading Competition",
       "GBP/USD Feb 21",
       web3.utils.toWei("0.1"),
-      startBlock ? new BigNumber(startBlock) : new BigNumber(blockNumber + 5),
+      startBlock ? new BigNumber(startBlock) : new BigNumber(blockNumber + 8),
       endBlock ? new BigNumber(endBlock) : new BigNumber(blockNumber + 10),
       distribution ? distribution : [
         new BigNumber(45),
@@ -46,12 +46,10 @@ contract("PrizeDistribution", accounts => {
       assert.equal(competition[0], "Vega Trading Competition");
       assert.equal(competition[1], accounts[0]);
       assert.equal(competition[2], "GBP/USD Feb 21");
-      assert.equal(competition[3].toNumber(), 0);
-      assert.equal(web3.utils.fromWei(competition[4]), 0.1);
-      assert.equal(competition[5].toNumber(), blockNumber + 5);
-      assert.equal(competition[6].toNumber(), blockNumber + 10);
-      assert.equal(competition[7], false);
-      assert.equal(competition[8], false);
+      assert.equal(web3.utils.fromWei(competition[3]), 0.1);
+      assert.equal(competition[4].toNumber(), blockNumber + 8);
+      assert.equal(competition[5].toNumber(), blockNumber + 10);
+      assert.equal(competition[6], false);
     }
   );
 
@@ -184,6 +182,22 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
+  it("should allow player to enter competition",
+    async() => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      await createCompetition(blockNumber);
+      await this.prizeDistribution.enterCompetition(1, {
+        from: accounts[0],
+        value: web3.utils.toWei("0.1")
+      });
+      const competition = await this.prizeDistribution.getCompetition.call(1);
+      assert.equal(competition[7].toNumber(), 1);
+      assert.equal(0.1, web3.utils.fromWei(
+        await web3.eth.getBalance(this.prizeDistribution.address)
+      ));
+    }
+  );
+
   it("should cancel competition when owner",
     async () => {
       const blockNumber = await web3.eth.getBlockNumber();
@@ -192,7 +206,7 @@ contract("PrizeDistribution", accounts => {
         from: accounts[0]
       });
       const competition = await this.prizeDistribution.getCompetition.call(1);
-      assert.equal(competition[8], true);
+      assert.equal(competition[6], true);
     }
   );
 
@@ -210,30 +224,18 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
-  it("should allow player to enter competition",
-    async() => {
-      const blockNumber = await web3.eth.getBlockNumber();
-      await createCompetition(blockNumber);
-      await this.prizeDistribution.enterCompetition(2, {
-        from: accounts[0],
-        value: web3.utils.toWei("0.1")
-      });
-      const competition = await this.prizeDistribution.getCompetition.call(2);
-      assert.equal(competition[3].toNumber(), 1);
-      assert.equal(0.1, web3.utils.fromWei(
-        await web3.eth.getBalance(this.prizeDistribution.address)
-      ));
-    }
-  );
-
   it("should not allow player to enter competition when full",
     async() => {
       await this.prizeDistribution.enterCompetition(2, {
         from: accounts[1],
         value: web3.utils.toWei("0.1")
       });
+      await this.prizeDistribution.enterCompetition(2, {
+        from: accounts[3],
+        value: web3.utils.toWei("0.1")
+      });
       const competition = await this.prizeDistribution.getCompetition.call(2);
-      assert.equal(competition[3].toNumber(), 2);
+      assert.equal(competition[7].toNumber(), 2);
       try {
         await this.prizeDistribution.enterCompetition(2, {
           from: accounts[2],
@@ -251,7 +253,7 @@ contract("PrizeDistribution", accounts => {
     async() => {
       try {
         await this.prizeDistribution.enterCompetition(2, {
-          from: accounts[0],
+          from: accounts[1],
           value: web3.utils.toWei("0.1")
         });
         assert.fail();
@@ -322,62 +324,62 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
-  it("should return fee when competition is canceled",
-    async() => {
-      const blockNumber = await web3.eth.getBlockNumber();
-      await createCompetition(blockNumber);
-      await this.prizeDistribution.enterCompetition(3, {
-        from: accounts[0],
-        value: web3.utils.toWei("0.1")
-      });
-      assert.equal(0.3, web3.utils.fromWei(
-        await web3.eth.getBalance(this.prizeDistribution.address)
-      ));
-      await this.prizeDistribution.cancelCompetition(3, {
-        from: accounts[0]
-      });
-      await this.prizeDistribution.returnEntryFee(3, accounts[0]);
-      assert.equal(0.2, web3.utils.fromWei(
-        await web3.eth.getBalance(this.prizeDistribution.address)
-      ));
-    }
-  );
+  // it("should return fee when competition is canceled",
+  //   async() => {
+  //     const blockNumber = await web3.eth.getBlockNumber();
+  //     await createCompetition(blockNumber);
+  //     await this.prizeDistribution.enterCompetition(3, {
+  //       from: accounts[0],
+  //       value: web3.utils.toWei("0.1")
+  //     });
+  //     assert.equal(0.3, web3.utils.fromWei(
+  //       await web3.eth.getBalance(this.prizeDistribution.address)
+  //     ));
+  //     await this.prizeDistribution.cancelCompetition(3, {
+  //       from: accounts[0]
+  //     });
+  //     await this.prizeDistribution.returnEntryFee(3, accounts[0]);
+  //     assert.equal(0.2, web3.utils.fromWei(
+  //       await web3.eth.getBalance(this.prizeDistribution.address)
+  //     ));
+  //   }
+  // );
 
-  it("should not return fee when competition doesn't exist",
-    async() => {
-      try {
-        await this.prizeDistribution.returnEntryFee(999, accounts[0]);
-        assert.fail();
-      } catch(e) {
-        assert.equal(_.includes(JSON.stringify(e),
-          "The competition does not exist."), true);
-      }
-    }
-  );
-
-  it("should not return fee when already returned to player",
-    async() => {
-      try {
-        await this.prizeDistribution.returnEntryFee(3, accounts[0]);
-        assert.fail();
-      } catch(e) {
-        assert.equal(_.includes(JSON.stringify(e),
-          "There is nothing to return to this player."), true);
-      }
-    }
-  );
-
-  it("should not return fee when competition is not canceled",
-    async() => {
-      try {
-        await this.prizeDistribution.returnEntryFee(2, accounts[0]);
-        assert.fail();
-      } catch(e) {
-        assert.equal(_.includes(JSON.stringify(e),
-          "The competition has not been canceled."), true);
-      }
-    }
-  );
+  // it("should not return fee when competition doesn't exist",
+  //   async() => {
+  //     try {
+  //       await this.prizeDistribution.returnEntryFee(999, accounts[0]);
+  //       assert.fail();
+  //     } catch(e) {
+  //       assert.equal(_.includes(JSON.stringify(e),
+  //         "The competition does not exist."), true);
+  //     }
+  //   }
+  // );
+  //
+  // it("should not return fee when already returned to player",
+  //   async() => {
+  //     try {
+  //       await this.prizeDistribution.returnEntryFee(3, accounts[0]);
+  //       assert.fail();
+  //     } catch(e) {
+  //       assert.equal(_.includes(JSON.stringify(e),
+  //         "There is nothing to return to this player."), true);
+  //     }
+  //   }
+  // );
+  //
+  // it("should not return fee when competition is not canceled",
+  //   async() => {
+  //     try {
+  //       await this.prizeDistribution.returnEntryFee(2, accounts[0]);
+  //       assert.fail();
+  //     } catch(e) {
+  //       assert.equal(_.includes(JSON.stringify(e),
+  //         "The competition has not been canceled."), true);
+  //     }
+  //   }
+  // );
 
   it("should fail to receive Ether sent to the contract",
     async () => {

@@ -20,23 +20,22 @@ contract PrizeDistribution is Ownable {
     string title;
     address owner;
     string externalReference;
-    uint256 depositCount;
     uint256 entryFee;
     uint256 startBlock;
     uint256 endBlock;
     bool valid;
-    bool playerRanksLocked;
     bool canceled;
+    bool commissionPaid;
+    uint256 commissionRate;
+    address[] players;
     mapping (address => uint256) deposits;
     mapping (uint256 => uint256) prizeDistribution;
-    mapping (address => bool) prizeDistributionApproved;
     mapping (uint256 => address) playerRanks;
   }
 
   mapping (uint => Competition) public competitions;
   uint256 public competitionCount = 0;
   uint256 public commissionRate;
-  uint256 public commissionRateLastUpdated;
   uint256 public maxPlayers;
 
   /**
@@ -54,14 +53,13 @@ contract PrizeDistribution is Ownable {
   /**
   * @dev Updates the commission rate used for competitions.
   */
-  function updateCommissionRate(uint256 _commissionRate) public {
+  function updateCommissionRate(uint256 _commissionRate) public onlyOwner {
     commissionRate = _commissionRate;
-    commissionRateLastUpdated = block.number;
   }
 
   /**
   * @dev Returns the commission that is charged by the smart contract on
-  * competition prize pools. A number between 0 and 1000, where 1000 = 100%.
+  * prize pools. A number between 0 and 1000, where 1000 = 100%.
   *
   * The commission is redeemable by the owner of the contract.
   */
@@ -70,7 +68,7 @@ contract PrizeDistribution is Ownable {
   }
 
   /**
-  * @dev Returns the count of competitions.
+  * @dev Returns the number of created competitions.
   */
   function getCompetitionCount() public view returns (uint256) {
     return competitionCount;
@@ -88,21 +86,19 @@ contract PrizeDistribution is Ownable {
     uint256,
     uint256,
     uint256,
-    uint256,
     bool,
-    bool
+    uint256
   ) {
     Competition storage competition = competitions[_competitionId];
     return (
       competition.title,
       competition.owner,
       competition.externalReference,
-      competition.depositCount,
       competition.entryFee,
       competition.startBlock,
       competition.endBlock,
-      competition.playerRanksLocked,
-      competition.canceled
+      competition.canceled,
+      competition.players.length
     );
   }
 
@@ -130,17 +126,19 @@ contract PrizeDistribution is Ownable {
       "The end block must be after the start block.");
     require(sumDistribution == 100,
       "The prize distribution must total 100%.");
+    address[] memory _players;
     competitions[competitionCount] = Competition({
       title: _title,
       owner: msg.sender,
-      depositCount: 0,
       externalReference: _externalReference,
       entryFee: _entryFee,
       startBlock: _startBlock,
       endBlock: _endBlock,
       valid: true,
       canceled: false,
-      playerRanksLocked: false
+      commissionPaid: false,
+      commissionRate: commissionRate,
+      players: _players
     });
     for(uint256 i=0; i<_distribution.length; i++) {
       competitions[competitionCount].prizeDistribution[i] = _distribution[i];
@@ -165,10 +163,10 @@ contract PrizeDistribution is Ownable {
       "This competition has been canceled.");
     require(block.number < competition.startBlock,
       "This competition has already started.");
-    require(competition.depositCount < maxPlayers,
+    require(competition.players.length < maxPlayers,
       "This competition is already full.");
     competition.deposits[msg.sender] = msg.value;
-    competition.depositCount += 1;
+    competition.players.push(msg.sender);
   }
 
   /**
@@ -180,11 +178,14 @@ contract PrizeDistribution is Ownable {
     Competition storage competition = competitions[_competitionId];
     require(competition.owner == msg.sender,
       "Only the owner of a competition can cancel it.");
-    require(competition.startBlock > block.number,
-      "You cannot cancel the competition because it has already started.");
     require(!competition.canceled,
       "The competition has already been canceled.");
-    competition.canceled = true;
+    require(competition.startBlock > block.number,
+      "You cannot cancel the competition because it has already started.");
+    competitions[_competitionId].canceled = true;
+    for(uint256 i=0; i<competition.players.length; i++) {
+      returnEntryFee(_competitionId, address(uint160(competition.players[i])));
+    }
   }
 
   /**
@@ -194,11 +195,9 @@ contract PrizeDistribution is Ownable {
   function returnEntryFee(
     uint256 _competitionId,
     address payable _player
-  ) public competitionExists(_competitionId) {
+  ) internal {
     Competition storage competition = competitions[_competitionId];
-    require(competition.canceled, "The competition has not been canceled.");
     uint256 playerDeposit = competition.deposits[_player];
-    require(playerDeposit > 0, "There is nothing to return to this player.");
     _player.transfer(playerDeposit);
     competitions[_competitionId].deposits[_player] = 0;
   }
@@ -217,15 +216,17 @@ contract PrizeDistribution is Ownable {
     address[] memory _players
   ) public competitionExists(_competitionId) onlyOwner {
     Competition storage competition = competitions[_competitionId];
-    require(!competition.playerRanksLocked, "The player ranks are already locked.");
-    require(_ranks.length == competition.depositCount, "You must submit ranks for every player in the competition.");
-    require(competition.endBlock < block.number, "The competition has not finished yet.");
-    require(_ranks.length == _players.length, "You must submit a rank for every player.");
+    require(_ranks.length == competition.players.length,
+      "You must submit ranks for every player in the competition.");
+    require(competition.endBlock < block.number,
+      "The competition has not finished yet.");
+    require(_ranks.length == _players.length,
+      "You must submit a rank for every player.");
     for(uint i=0; i<_players.length; i++) {
-      require(competition.deposits[_players[i]] > 0, "You submitted a player that has not entered the competition.");
+      require(competition.deposits[_players[i]] > 0,
+        "You submitted a player that has not entered the competition.");
       competitions[_competitionId].playerRanks[_ranks[i]] = _players[i];
     }
-    competition.playerRanksLocked = true;
   }
 
   /**
@@ -237,6 +238,8 @@ contract PrizeDistribution is Ownable {
     uint256 _competitionId
   ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
+    require(!competition.canceled,
+      "This competition was canceled. You can only withdraw the original entrance fee.");
     // TODO - send the prize to the sender if they entered the competition and have not already claime their prize
   }
 
@@ -247,7 +250,15 @@ contract PrizeDistribution is Ownable {
     uint256 _competitionId
   ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
-    // TODO - send unpaid commission to the contract owner
+    require(!competition.commissionPaid,
+      "The commission has already been paid out.");
+    require(competition.endBlock < block.number,
+      "The competition has not finished yet.");
+    uint256 commission = competition.players.length
+                          .mul(competition.entryFee)
+                          .mul(competition.commissionRate.div(1000));
+    address(uint160(owner())).transfer(commission);
+    competition.commissionPaid = true;
   }
 
   /**
