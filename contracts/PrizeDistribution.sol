@@ -12,7 +12,6 @@ contract PrizeDistribution is Ownable {
     address owner;
     string externalReference;
     uint256 depositCount;
-    uint256 distributionApprovalRate;
     uint256 entryFee;
     uint256 startBlock;
     uint256 endBlock;
@@ -31,6 +30,10 @@ contract PrizeDistribution is Ownable {
   uint256 public commissionRateLastUpdated;
   uint256 public maxPlayers;
 
+  /**
+  * @dev Sets the commission rate charged on competitions and max players
+  * permitted in a single competition on creation of the contract.
+  */
   constructor(
     uint256 _commissionRate,
     uint256 _maxPlayers
@@ -77,7 +80,6 @@ contract PrizeDistribution is Ownable {
     uint256,
     uint256,
     uint256,
-    uint256,
     bool,
     bool
   ) {
@@ -88,7 +90,6 @@ contract PrizeDistribution is Ownable {
       competition.owner,
       competition.externalReference,
       competition.depositCount,
-      competition.distributionApprovalRate,
       competition.entryFee,
       competition.startBlock,
       competition.endBlock,
@@ -105,7 +106,6 @@ contract PrizeDistribution is Ownable {
     string memory _title,
     string memory _externalReference,
     uint256 _entryFee,
-    uint256 _distributionApprovalRate,
     uint256 _startBlock,
     uint256 _endBlock,
     uint256[] memory _distribution
@@ -116,10 +116,6 @@ contract PrizeDistribution is Ownable {
     for(uint256 i=0; i<_distribution.length; i++) {
       sumDistribution = sumDistribution.add(_distribution[i]);
     }
-    require(_distributionApprovalRate > 0,
-      "The distribution approval rate must be greater than zero.");
-    require(_distributionApprovalRate <= 100,
-      "The distribution approval rate must be less than or equal to 100.");
     require(_startBlock > block.number,
       "The start block must be after the current block.");
     require(_endBlock > _startBlock,
@@ -132,7 +128,6 @@ contract PrizeDistribution is Ownable {
       depositCount: 0,
       externalReference: _externalReference,
       entryFee: _entryFee,
-      distributionApprovalRate: _distributionApprovalRate,
       startBlock: _startBlock,
       endBlock: _endBlock,
       valid: true,

@@ -7,7 +7,6 @@ contract("PrizeDistribution", accounts => {
 
   const createCompetition = async (
     blockNumber,
-    approvalRate,
     distribution,
     startBlock,
     endBlock
@@ -16,7 +15,6 @@ contract("PrizeDistribution", accounts => {
       "Vega Trading Competition",
       "GBP/USD Feb 21",
       web3.utils.toWei("0.1"),
-      approvalRate || approvalRate == 0 ? new BigNumber(approvalRate) : new BigNumber(66),
       startBlock ? new BigNumber(startBlock) : new BigNumber(blockNumber + 5),
       endBlock ? new BigNumber(endBlock) : new BigNumber(blockNumber + 10),
       distribution ? distribution : [
@@ -49,12 +47,11 @@ contract("PrizeDistribution", accounts => {
       assert.equal(competition[1], accounts[0]);
       assert.equal(competition[2], "GBP/USD Feb 21");
       assert.equal(competition[3].toNumber(), 0);
-      assert.equal(competition[4].toNumber(), 66);
-      assert.equal(web3.utils.fromWei(competition[5]), 0.1);
-      assert.equal(competition[6].toNumber(), blockNumber + 5);
-      assert.equal(competition[7].toNumber(), blockNumber + 10);
+      assert.equal(web3.utils.fromWei(competition[4]), 0.1);
+      assert.equal(competition[5].toNumber(), blockNumber + 5);
+      assert.equal(competition[6].toNumber(), blockNumber + 10);
+      assert.equal(competition[7], false);
       assert.equal(competition[8], false);
-      assert.equal(competition[9], false);
     }
   );
 
@@ -62,7 +59,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, null, [
+        await createCompetition(blockNumber, [
           new BigNumber(45),
           new BigNumber(30),
           new BigNumber(15),
@@ -81,7 +78,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, null, [
+        await createCompetition(blockNumber, [
           new BigNumber(10),
           new BigNumber(10),
           new BigNumber(10),
@@ -102,37 +99,11 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
-  it("should not create competition with approval rate of zero",
-    async () => {
-      try {
-        const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, 0);
-        assert.fail();
-      } catch(e) {
-        assert.equal(_.includes(JSON.stringify(e),
-          "The distribution approval rate must be greater than zero."), true);
-      }
-    }
-  );
-
-  it("should not create competition with approval rate over 100",
-    async () => {
-      try {
-        const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, 101);
-        assert.fail();
-      } catch(e) {
-        assert.equal(_.includes(JSON.stringify(e),
-          "The distribution approval rate must be less than or equal to 100."), true);
-      }
-    }
-  );
-
   it("should not create competition with start block in the past",
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, null, null, blockNumber - 1);
+        await createCompetition(blockNumber, null, blockNumber - 1);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -145,7 +116,7 @@ contract("PrizeDistribution", accounts => {
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
-        await createCompetition(blockNumber, null, null, blockNumber + 5, blockNumber + 3);
+        await createCompetition(blockNumber, null, blockNumber + 5, blockNumber + 3);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -221,7 +192,7 @@ contract("PrizeDistribution", accounts => {
         from: accounts[0]
       });
       const competition = await this.prizeDistribution.getCompetition.call(1);
-      assert.equal(competition[9], true);
+      assert.equal(competition[8], true);
     }
   );
 
