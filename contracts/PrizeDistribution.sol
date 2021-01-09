@@ -7,6 +7,15 @@ contract PrizeDistribution is Ownable {
 
   using SafeMath for uint256;
 
+  /**
+   * @dev Throws if competition does not exist.
+   */
+  modifier competitionExists(uint256 _competitionId) {
+    require(competitions[_competitionId].valid,
+      "The competition does not exist.");
+    _;
+  }
+
   struct Competition {
     string title;
     address owner;
@@ -72,7 +81,7 @@ contract PrizeDistribution is Ownable {
   */
   function getCompetition(
     uint _competitionId
-  ) public view returns (
+  ) public competitionExists(_competitionId) view returns (
     string memory,
     address,
     string memory,
@@ -84,7 +93,6 @@ contract PrizeDistribution is Ownable {
     bool
   ) {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
     return (
       competition.title,
       competition.owner,
@@ -147,10 +155,8 @@ contract PrizeDistribution is Ownable {
    */
   function enterCompetition(
     uint256 _competitionId
-  ) public payable {
+  ) public competitionExists(_competitionId) payable {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid,
-      "The competition does not exist.");
     require(msg.value == competition.entryFee,
       "You must deposit the exact entry fee in Ether.");
     require(competition.deposits[msg.sender] == 0x0,
@@ -170,9 +176,8 @@ contract PrizeDistribution is Ownable {
    */
   function cancelCompetition(
     uint256 _competitionId
-  ) public {
+  ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
     require(competition.owner == msg.sender,
       "Only the owner of a competition can cancel it.");
     require(competition.startBlock > block.number,
@@ -189,9 +194,8 @@ contract PrizeDistribution is Ownable {
   function returnEntryFee(
     uint256 _competitionId,
     address payable _player
-  ) public {
+  ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
     require(competition.canceled, "The competition has not been canceled.");
     uint256 playerDeposit = competition.deposits[_player];
     require(playerDeposit > 0, "There is nothing to return to this player.");
@@ -211,9 +215,8 @@ contract PrizeDistribution is Ownable {
     uint256 _competitionId,
     uint256[] memory _ranks,
     address[] memory _players
-  ) public onlyOwner {
+  ) public competitionExists(_competitionId) onlyOwner {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
     require(!competition.playerRanksLocked, "The player ranks are already locked.");
     require(_ranks.length == competition.depositCount, "You must submit ranks for every player in the competition.");
     require(competition.endBlock < block.number, "The competition has not finished yet.");
@@ -232,9 +235,8 @@ contract PrizeDistribution is Ownable {
    */
   function withdrawPrizes(
     uint256 _competitionId
-  ) public {
+  ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
     // TODO - send the prize to the sender if they entered the competition and have not already claime their prize
   }
 
@@ -243,9 +245,8 @@ contract PrizeDistribution is Ownable {
   */
   function withdrawCommission(
     uint256 _competitionId
-  ) public {
+  ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
-    require(competition.valid, "The competition does not exist.");
     // TODO - send unpaid commission to the contract owner
   }
 
