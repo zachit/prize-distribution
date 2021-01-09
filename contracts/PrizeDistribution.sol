@@ -47,6 +47,7 @@ contract PrizeDistribution is Ownable {
     uint256 _maxPlayers
   ) public {
     maxPlayers = _maxPlayers;
+    require(_commissionRate <= 1000, "Commission rate must be <= 1000.");
     updateCommissionRate(_commissionRate);
   }
 
@@ -189,8 +190,7 @@ contract PrizeDistribution is Ownable {
   }
 
   /**
-   * @dev If a competition has been canceled anybody can call this
-   * function to return the entrace fee to the original depositor.
+   * @dev Returns a player's entrance fee (called internally on cancel).
    */
   function returnEntryFee(
     uint256 _competitionId,
@@ -230,7 +230,7 @@ contract PrizeDistribution is Ownable {
   }
 
   /**
-   * @dev If the prizes of a competition have been locked by the owner, then
+   * @dev If the the player ranks have been set by the owner, then
    * anybody can call this function and the prizes will be distributed to
    * the original depositors according the prize distribution and player ranks.
    */
@@ -252,8 +252,8 @@ contract PrizeDistribution is Ownable {
     Competition storage competition = competitions[_competitionId];
     require(!competition.commissionPaid,
       "The commission has already been paid out.");
-    require(competition.endBlock < block.number,
-      "The competition has not finished yet.");
+    require(competition.startBlock < block.number,
+      "The competition has not started yet.");
     uint256 commission = competition.players.length
                           .mul(competition.entryFee)
                           .mul(competition.commissionRate.div(1000));

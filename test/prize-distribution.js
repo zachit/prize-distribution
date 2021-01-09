@@ -1,5 +1,6 @@
 const PrizeDistribution = artifacts.require("PrizeDistribution");
 const _ = require("lodash");
+const timeMachine = require('ganache-time-traveler');
 
 contract("PrizeDistribution", accounts => {
 
@@ -28,13 +29,13 @@ contract("PrizeDistribution", accounts => {
   };
 
   before(async () => {
-    this.prizeDistribution = await PrizeDistribution.new(web3.utils.toWei("5"), new BigNumber(2));
+    this.prizeDistribution = await PrizeDistribution.new(new BigNumber(5), new BigNumber(2));
   });
 
   it("should init the PrizeDistribution contract correctly",
     async () => {
       const commissionRate = await this.prizeDistribution.getCommissionRate.call();
-      assert.equal(commissionRate, web3.utils.toWei("5"));
+      assert.equal(commissionRate.toNumber(), 5);
     }
   );
 
@@ -72,7 +73,7 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
-  it("should not create competition prize distribution is too large",
+  it("should not create competition when prize distribution is too large",
     async () => {
       try {
         const blockNumber = await web3.eth.getBlockNumber();
@@ -138,7 +139,7 @@ contract("PrizeDistribution", accounts => {
   it("should get competition count",
     async () => {
       const count = await this.prizeDistribution.getCompetitionCount();
-      assert.equal(count.toNumber(), 1);
+      assert.equal(count.toNumber() > 0, true);
     }
   );
 
@@ -285,7 +286,8 @@ contract("PrizeDistribution", accounts => {
         await this.prizeDistribution.enterCompetition(999, {
           from: accounts[1],
           value: web3.utils.toWei("0.1")
-        });
+        });      const blockNumber = await web3.eth.getBlockNumber();
+      createCompetition(blockNumber);
         assert.fail();
       } catch(e) {
         assert.equal(_.includes(JSON.stringify(e),
@@ -324,63 +326,6 @@ contract("PrizeDistribution", accounts => {
     }
   );
 
-  // it("should return fee when competition is canceled",
-  //   async() => {
-  //     const blockNumber = await web3.eth.getBlockNumber();
-  //     await createCompetition(blockNumber);
-  //     await this.prizeDistribution.enterCompetition(3, {
-  //       from: accounts[0],
-  //       value: web3.utils.toWei("0.1")
-  //     });
-  //     assert.equal(0.3, web3.utils.fromWei(
-  //       await web3.eth.getBalance(this.prizeDistribution.address)
-  //     ));
-  //     await this.prizeDistribution.cancelCompetition(3, {
-  //       from: accounts[0]
-  //     });
-  //     await this.prizeDistribution.returnEntryFee(3, accounts[0]);
-  //     assert.equal(0.2, web3.utils.fromWei(
-  //       await web3.eth.getBalance(this.prizeDistribution.address)
-  //     ));
-  //   }
-  // );
-
-  // it("should not return fee when competition doesn't exist",
-  //   async() => {
-  //     try {
-  //       await this.prizeDistribution.returnEntryFee(999, accounts[0]);
-  //       assert.fail();
-  //     } catch(e) {
-  //       assert.equal(_.includes(JSON.stringify(e),
-  //         "The competition does not exist."), true);
-  //     }
-  //   }
-  // );
-  //
-  // it("should not return fee when already returned to player",
-  //   async() => {
-  //     try {
-  //       await this.prizeDistribution.returnEntryFee(3, accounts[0]);
-  //       assert.fail();
-  //     } catch(e) {
-  //       assert.equal(_.includes(JSON.stringify(e),
-  //         "There is nothing to return to this player."), true);
-  //     }
-  //   }
-  // );
-  //
-  // it("should not return fee when competition is not canceled",
-  //   async() => {
-  //     try {
-  //       await this.prizeDistribution.returnEntryFee(2, accounts[0]);
-  //       assert.fail();
-  //     } catch(e) {
-  //       assert.equal(_.includes(JSON.stringify(e),
-  //         "The competition has not been canceled."), true);
-  //     }
-  //   }
-  // );
-
   it("should fail to receive Ether sent to the contract",
     async () => {
       try {
@@ -393,6 +338,23 @@ contract("PrizeDistribution", accounts => {
         assert.equal(_.includes(JSON.stringify(e),
           "You must not send Ether directly to this contract."), true);
       }
+    }
+  );
+
+  it("should withdraw commission",
+    async() => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      createCompetition(blockNumber, null, blockNumber + 3, blockNumber + 4);
+      const count = await this.prizeDistribution.getCompetitionCount();
+      const competitionId = count.toNumber() - 1;
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[0],
+        value: web3.utils.toWei("0.1")
+      });
+      let competition = await this.prizeDistribution.getCompetition.call(competitionId);
+      assert.equal(competition[7].toNumber(), 1);
+      await timeMachine.advanceTimeAndBlock(60);
+      await this.prizeDistribution.withdrawCommission(competitionId);
     }
   );
 });
