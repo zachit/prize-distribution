@@ -205,8 +205,7 @@ contract PrizeDistribution is Ownable {
    *
    * Note: the owner does not need to necessarily be a sigle actor. The owner
    * of the contract could be a Multisig wallet with multiple signatories
-   * required, resulting in this function performing the role of
-   * a decentralised oracle.
+   * required, resulting in this function performing the role of an oracle.
    */
   function submitPlayerRanks(
     uint256 _competitionId,
@@ -216,7 +215,7 @@ contract PrizeDistribution is Ownable {
     Competition storage competition = competitions[_competitionId];
     require(competition.valid, "The competition does not exist.");
     require(!competition.playerRanksLocked, "The player ranks are already locked.");
-    require(_ranks.length < competition.depositCount, "The rank submitted is not valid for the competition.");
+    require(_ranks.length == competition.depositCount, "You must submit ranks for every player in the competition.");
     require(competition.endBlock < block.number, "The competition has not finished yet.");
     require(_ranks.length == _players.length, "You must submit a rank for every player.");
     for(uint i=0; i<_players.length; i++) {
@@ -237,6 +236,17 @@ contract PrizeDistribution is Ownable {
     Competition storage competition = competitions[_competitionId];
     require(competition.valid, "The competition does not exist.");
     // TODO - send the prize to the sender if they entered the competition and have not already claime their prize
+  }
+
+  /**
+  * @dev Anybody can withdraw unpaid commission to the contract owner.
+  */
+  function withdrawCommission(
+    uint256 _competitionId
+  ) public {
+    Competition storage competition = competitions[_competitionId];
+    require(competition.valid, "The competition does not exist.");
+    // TODO - send unpaid commission to the contract owner
   }
 
   /**

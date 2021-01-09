@@ -378,4 +378,19 @@ contract("PrizeDistribution", accounts => {
       }
     }
   );
+
+  it("should fail to receive Ether sent to the contract",
+    async () => {
+      try {
+        await this.prizeDistribution.sendTransaction({
+            value: web3.utils.toWei("0.1"),
+            from: accounts[0]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "You must not send Ether directly to this contract."), true);
+      }
+    }
+  );
 });
