@@ -437,4 +437,18 @@ contract("PrizeDistribution", accounts => {
       });
     }
   );
+
+  it("should fail to update commission rate when over 1000",
+    async() => {
+      try {
+        await this.prizeDistribution.updateCommissionRate(1001, {
+          from: accounts[0]
+        });
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "Commission rate must be <= 1000."), true);
+      }
+    }
+  );
 });

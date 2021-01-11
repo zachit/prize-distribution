@@ -47,7 +47,6 @@ contract PrizeDistribution is Ownable {
     uint256 _maxPlayers
   ) public {
     maxPlayers = _maxPlayers;
-    require(_commissionRate <= 1000, "Commission rate must be <= 1000.");
     updateCommissionRate(_commissionRate);
   }
 
@@ -55,6 +54,7 @@ contract PrizeDistribution is Ownable {
   * @dev Updates the commission rate used for competitions.
   */
   function updateCommissionRate(uint256 _commissionRate) public onlyOwner {
+    require(_commissionRate <= 1000, "Commission rate must be <= 1000.");
     commissionRate = _commissionRate;
   }
 
