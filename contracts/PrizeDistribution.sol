@@ -25,6 +25,7 @@ contract PrizeDistribution is Ownable {
     uint256 startBlock;
     uint256 endBlock;
     // uint256 stakeToPrizeRatio;
+    // uint256[] fib;
     bool valid;
     bool playerRanksLocked;
     bool canceled;
@@ -91,6 +92,7 @@ contract PrizeDistribution is Ownable {
     uint256,
     uint256,
     // uint256,
+    // uin256[],
     bool,
     bool
   ) {
@@ -103,7 +105,8 @@ contract PrizeDistribution is Ownable {
       competition.entryFee,
       competition.startBlock,
       competition.endBlock,
-      // competition.stakeToPrizeRatio
+      // competition.stakeToPrizeRatio,
+      // competition.fib,
       competition.playerRanksLocked,
       competition.canceled
     );
@@ -242,20 +245,73 @@ contract PrizeDistribution is Ownable {
       competitions[_competitionId].playerRanks[_ranks[i]] = _players[i];
     }
     competition.playerRanksLocked = true;
+    setPrizesByRank(_competitionId);
   }
 
-  /** 
-   * another option for setting prize distributions, other than manually:
-   * construct a fibonacci array competition.fib for the competition that is the same length as competition.deposits
-   * sum the numbers in the competition.fib --> sumFib
-   * 
-   playerRanks = competitions[_competitionId].playerRanks
-   for(uint i=0; i<playerRanks.length; i++) {
-    uint256 prize = entry_fee * (1-stakeToPrizeRatio) * competition.fib[i] / sumFib
-    uint256 distribution = entry_fee * stakeToPrizeRatio + prize
-    playerRanks[i].transfer(distribution)
-   }
-   */
+  // some function for setting the fib prizes
+
+  function setPrizesByRank(
+     uint256 _competitionId
+   ) public competitionExists(_competitionId) {
+    Competition storage competition = competitions[_competitionId];
+    require(block.number > competition.startBlock,
+      "The competition is still accepting participants, please call after entry has closed");
+    // declare dynamic array competition.fib, not sure where to put this re storage/memory etc
+    
+    // I put this into function buildFib()
+    // for (uint i=0; i<competition.deposits.length; i++) {
+    //  if (competition.fib.length == 0) {
+    //    competition.fib.push(1);
+    //  } else if (competition.fib.length = 1) {
+    //    competition.fib.push(2);
+    //  } else {
+    //    nextFib = competition.fib[i-1] + competition.fib[i-2];
+    //    competition.fib.push(nextFib);
+    //  }
+     competition.fib = buildFib(competition.deposits);
+     uint256 fibSum = getArraySum(competition.fib);
+     for (uint i=0; i<competition.fib.length; i++) {
+       competition.fib[i] = competition.fib[i]/fibSum/competition.fib.length;
+     }
+
+     // then (haven't coded this yet)
+     // distribution = competition.deposits[_player]*(stake + competition.fib[i])
+
+    }
+
+    function buildFib(
+      uint[] _array
+      ) public pure
+      returns (uint[] fib)
+    {
+      uint[] fib;
+      for (uint i=0; i<_array.length; i++) {
+        if (_array.length == 0) {
+          fib.push(1);
+        } else if (_array.length == 1) {
+          fib.push(2);
+        } else {
+          nextFib = fib[i-1] + fib[i-2];
+          fib.push(nextFib);
+        }
+      }
+      return fib;
+    }
+
+  function getArraySum(
+    uint[] _array
+  ) public pure
+   returns (uint sum_)
+  {
+    sum_ = 0;
+    for (uint i=0; i<_array.length; i++) {
+      sum_ += _array[i];
+    }
+  }
+
+  // set the amounts to transfer
+  function stakePlusPrize
+
 
   /**
    * @dev If the prizes of a competition have been locked by the owner, then
