@@ -268,15 +268,16 @@ contract PrizeDistribution is Ownable {
 
     function buildDistributions(
       uint256[] _depositsArray,
-      uint256 _stake
+      uint256 _stakeToPriceRatio
     ) public pure
     returns (uint[] distributions)
     {
       uint[] prizeModel = buildFibPrizeModel(_depositsArray);
       uint[] distributions;
       for (i=0; i<prizeModel.length; i++) {
-        uint distribution = _stake + prizeModel[i];
-        distributions.push(distribution);
+        uint256 prize = (1 - _stakeToPriceRatio) * prizeModel[i];
+        uint256 distribution = (_stakeToPriceRatio + prize) * _depositsArray[i];
+        distributions.push(distribution); // now competition.deposits[i] should match up with distributions[i]
       }
       return distributions;
     }
@@ -293,7 +294,7 @@ contract PrizeDistribution is Ownable {
         } else if (fib.length == 1) {
           fib.push(1);
         } else {
-          nextFib = fib[i-1]/_array.length/5 + fib[i-2]; // as "5" increases, more winnings go towards the top quartile
+          nextFib = fib[i-1]*5/_array.length + fib[i-2]; // as "5" increases, more winnings go towards the top quartile
           fib.push(nextFib);
         }
       }

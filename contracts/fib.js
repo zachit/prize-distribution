@@ -8,7 +8,7 @@ function buildDistributions(
     _stake
   )
   {
-    prizeModel = buildFibPrizeModel(_depositsArray);
+    const prizeModel = buildFibPrizeModel(_depositsArray);
     let distributions = [];
     for (i=0; i<prizeModel.length; i++) {
        distribution = _stake + prizeModel[i];
@@ -27,12 +27,14 @@ function buildDistributions(
       if (fib.length == 0) {
         fib.push(1-(1/_array.length));
       } else if (fib.length == 1) {
-        fib.push(2);
+        fib.push(1);
       } else {
-        nextFib = fib[i-1]/_array.length/5 + fib[i-2]; // as "5" increases, more winnings go towards the top quartile
+        nextFib = fib[i-1]*5/_array.length + fib[i-2]; // as "5" increases, more winnings go towards the top quartile
         fib.push(nextFib);
       }
     }
+    console.log('fib is, ', fib) 
+
     var fibSum = getArraySum(fib);
     for ( i=0; i<fib.length; i++) {
      fib[i] = fib[i]/fibSum/fib.length;
