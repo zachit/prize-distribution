@@ -25,7 +25,7 @@ contract PrizeDistribution is Ownable {
     uint256 startBlock;
     uint256 endBlock;
     // uint256 stakeToPrizeRatio;
-    // uint256[] fib;
+    // uint256[] distributions;
     bool valid;
     bool playerRanksLocked;
     bool canceled;
@@ -106,7 +106,7 @@ contract PrizeDistribution is Ownable {
       competition.startBlock,
       competition.endBlock,
       // competition.stakeToPrizeRatio,
-      // competition.fib,
+      // competition.distributions,
       competition.playerRanksLocked,
       competition.canceled
     );
@@ -256,30 +256,31 @@ contract PrizeDistribution is Ownable {
     Competition storage competition = competitions[_competitionId];
     require(block.number > competition.startBlock,
       "The competition is still accepting participants, please call after entry has closed");
-    // declare dynamic array competition.fib, not sure where to put this re storage/memory etc
     
-    // I put this into function buildFib()
-    // for (uint i=0; i<competition.deposits.length; i++) {
-    //  if (competition.fib.length == 0) {
-    //    competition.fib.push(1);
-    //  } else if (competition.fib.length = 1) {
-    //    competition.fib.push(2);
-    //  } else {
-    //    nextFib = competition.fib[i-1] + competition.fib[i-2];
-    //    competition.fib.push(nextFib);
-    //  }
-     competition.fib = buildFib(competition.deposits);
-     uint256 fibSum = getArraySum(competition.fib);
-     for (uint i=0; i<competition.fib.length; i++) {
-       competition.fib[i] = competition.fib[i]/fibSum/competition.fib.length;
-     }
+    // I've declared competition.distributions in the competition struct, not sure if that's right
+    
+    // build (stake + prize) array
+     competition.distributions = buildDistributions(competition.deposits, competition.stakeToPrizeRatio);
 
-     // then (haven't coded this yet)
-     // distribution = competition.deposits[_player]*(stake + competition.fib[i])
+    // now need to map player id to distribution
 
     }
 
-    function buildFib(
+    function buildDistributions(
+      uint256[] _depositsArray,
+      uint256 _stake
+    ) public pure
+    returns (uint[] distributions)
+    {
+      uint[] prizeModel = buildFibPrizeModel(_depositsArray);
+      uint[] distributions;
+      for (i=0; i<prizeModel.length; i++) {
+        uint distribution = _stake + prizeModel[i];
+        distributions.push(distribution);
+      }
+    }
+
+    function buildFibPrizeModel(
       uint[] _array
       ) public pure
       returns (uint[] fib)
@@ -287,14 +288,18 @@ contract PrizeDistribution is Ownable {
       uint[] fib;
       for (uint i=0; i<_array.length; i++) {
         if (_array.length == 0) {
-          fib.push(1);
+          fib.push(1-1/_array.length);
         } else if (_array.length == 1) {
           fib.push(2);
         } else {
-          nextFib = fib[i-1] + fib[i-2];
+          nextFib = fib[i-1]/array.length/5 + fib[i-2]; // as "5" increases, more winnings go towards the top quartile
           fib.push(nextFib);
         }
       }
+      uint256 fibSum = getArraySum(fib);
+      for (uint i=0; i<fib.length; i++) {
+       fib[i] = fib[i]/fibSum/fib.length;
+     }
       return fib;
     }
 
@@ -308,9 +313,6 @@ contract PrizeDistribution is Ownable {
       sum_ += _array[i];
     }
   }
-
-  // set the amounts to transfer
-  function stakePlusPrize
 
 
   /**
