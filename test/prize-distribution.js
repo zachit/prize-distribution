@@ -368,7 +368,7 @@ contract("PrizeDistribution", accounts => {
         from: accounts[8]
       });
       const ownerBalanceAfter = await web3.eth.getBalance(await this.prizeDistribution.owner());
-      assert.equal(Number(web3.utils.fromWei(ownerBalanceBefore)) + 0.0005, Number(web3.utils.fromWei(ownerBalanceAfter)));
+      assert.equal((Number(web3.utils.fromWei(ownerBalanceBefore)) + 0.0005).toFixed(2), Number(web3.utils.fromWei(ownerBalanceAfter)).toFixed(2));
     }
   );
 
@@ -387,7 +387,7 @@ contract("PrizeDistribution", accounts => {
           "The commission has already been paid out."), true);
       }
       const ownerBalanceAfter = await web3.eth.getBalance(await this.prizeDistribution.owner());
-      assert.equal(Number(web3.utils.fromWei(ownerBalanceBefore)), Number(web3.utils.fromWei(ownerBalanceAfter)));
+      assert.equal(Number(web3.utils.fromWei(ownerBalanceBefore)).toFixed(2), Number(web3.utils.fromWei(ownerBalanceAfter)).toFixed(2));
     }
   );
 
@@ -449,6 +449,34 @@ contract("PrizeDistribution", accounts => {
         assert.equal(_.includes(JSON.stringify(e),
           "Commission rate must be <= 1000."), true);
       }
+    }
+  );
+
+  it("should withdraw prizes",
+    async () => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      createCompetition(blockNumber, null, blockNumber + 4, blockNumber + 5);
+      const count = await this.prizeDistribution.getCompetitionCount();
+      const competitionId = count.toNumber() - 1;
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[1],
+        value: web3.utils.toWei("0.1")
+      });
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[2],
+        value: web3.utils.toWei("0.1")
+      });
+      let competition = await this.prizeDistribution.getCompetition.call(competitionId);
+      assert.equal(competition[7].toNumber(), 2);
+      await timeMachine.advanceTimeAndBlock(60);
+      await timeMachine.advanceTimeAndBlock(60);
+      await timeMachine.advanceTimeAndBlock(60);
+      await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[1], accounts[2]], {
+        from: accounts[0]
+      });
+      await this.prizeDistribution.withdrawPrizes(competitionId, {
+        from: accounts[0]
+      });
     }
   );
 });

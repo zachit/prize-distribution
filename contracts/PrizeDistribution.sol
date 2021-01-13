@@ -26,11 +26,13 @@ contract PrizeDistribution is Ownable {
     bool valid;
     bool canceled;
     bool commissionPaid;
+    bool prizesPaid;
     uint256 commissionRate;
+    uint256 stakeToPrizeRatio;
     address[] players;
+    uint256[] prizeDistribution;
+    address[] playerRanks;
     mapping (address => uint256) deposits;
-    mapping (uint256 => uint256) prizeDistribution;
-    mapping (uint256 => address) playerRanks;
   }
 
   mapping (uint => Competition) public competitions;
@@ -112,22 +114,17 @@ contract PrizeDistribution is Ownable {
     string memory _externalReference,
     uint256 _entryFee,
     uint256 _startBlock,
-    uint256 _endBlock,
-    uint256[] memory _distribution
+    uint256 _endBlock
   ) public {
-    uint256 sumDistribution = 0;
-    require(_distribution.length <= 10,
-      "The prize distribution cannot have more than 10 categories.");
-    for(uint256 i=0; i<_distribution.length; i++) {
-      sumDistribution = sumDistribution.add(_distribution[i]);
-    }
     require(_startBlock > block.number,
       "The start block must be after the current block.");
     require(_endBlock > _startBlock,
       "The end block must be after the start block.");
-    require(sumDistribution == 100,
-      "The prize distribution must total 100%.");
+    require(_entryFee > 0,
+      "There must be a fee to enter the competition.");
     address[] memory _players;
+    address[] memory _playerRanks;
+    uint256[] memory _distribution;
     competitions[competitionCount] = Competition({
       title: _title,
       owner: msg.sender,
@@ -138,12 +135,13 @@ contract PrizeDistribution is Ownable {
       valid: true,
       canceled: false,
       commissionPaid: false,
+      prizesPaid: false,
       commissionRate: commissionRate,
-      players: _players
+      players: _players,
+      prizeDistribution: _distribution,
+      playerRanks: _playerRanks,
+      stakeToPrizeRatio: 50
     });
-    for(uint256 i=0; i<_distribution.length; i++) {
-      competitions[competitionCount].prizeDistribution[i] = _distribution[i];
-    }
     competitionCount += 1;
   }
 
@@ -202,6 +200,53 @@ contract PrizeDistribution is Ownable {
     competitions[_competitionId].deposits[_player] = 0;
   }
 
+  function buildDistribution(
+    uint256 _playerCount,
+    uint256 _entryFee,
+    uint256 _stakeToPrizeRatio
+  ) internal returns (uint256[] memory) {
+    uint256[] memory prizeModel = buildFibPrizeModel(_playerCount);
+    uint256[] memory distributions = new uint[](_playerCount);
+    for (uint256 i=0; i<prizeModel.length; i++) {
+      uint256 prize = (1 - _stakeToPrizeRatio) * prizeModel[i];
+      uint256 distribution = (_stakeToPrizeRatio + prize) * _entryFee;
+      distributions[i] = distribution;
+    }
+    return distributions;
+  }
+
+  function buildFibPrizeModel(
+    uint256 _playerCount
+  ) internal returns (uint256[] memory) {
+    uint256[] memory fib = new uint[](_playerCount);
+    for (uint256 i=0; i<_playerCount; i++) {
+      if (fib.length == 0) {
+        fib[i] = 1 - 1 / _playerCount;
+      } else if (fib.length == 1) {
+        fib[i] = 1;
+      } else {
+        // as "5" increases, more winnings go towards the top quartile
+        uint256 nextFib = fib[i-1] * 5 / _playerCount + fib[i-2];
+        fib[i] = nextFib;
+      }
+    }
+    uint256 fibSum = getArraySum(fib);
+    for (uint256 i=0; i<fib.length; i++) {
+      fib[i] = fib[i].div(fibSum).div(fib.length);
+    }
+    return fib;
+  }
+
+  function getArraySum(
+    uint256[] memory _array
+  ) internal returns (uint256) {
+    uint256 sum = 0;
+    for (uint256 i=0; i<_array.length; i++) {
+      sum = sum.add(_array[i]);
+    }
+    return sum;
+  }
+
   /**
    * @dev The owner of the smart contract can call this function to submit
    * the rank of each player once the competition has finished.
@@ -219,10 +264,16 @@ contract PrizeDistribution is Ownable {
       "You must submit ranks for every player in the competition.");
     require(competition.endBlock < block.number,
       "The competition has not finished yet.");
+    competitions[_competitionId].playerRanks.length = 0;
+    competition.prizeDistribution = buildDistribution(
+      competition.players.length,
+      competition.entryFee,
+      competition.stakeToPrizeRatio
+    );
     for(uint i=0; i<_players.length; i++) {
       require(competition.deposits[_players[i]] > 0,
         "You submitted a player that has not entered the competition.");
-      competitions[_competitionId].playerRanks[i] = _players[i];
+      competitions[_competitionId].playerRanks.push(_players[i]);
     }
   }
 
@@ -236,8 +287,20 @@ contract PrizeDistribution is Ownable {
   ) public competitionExists(_competitionId) {
     Competition storage competition = competitions[_competitionId];
     require(!competition.canceled,
-      "This competition was canceled. You can only withdraw the original entrance fee.");
-    // TODO - send the prize to the sender if they entered the competition and have not already claime their prize
+      "This competition was canceled. There are no prizes to withdraw.");
+    require(!competition.prizesPaid, "The prizes have already been paid.");
+    require(competition.playerRanks.length > 0,
+      "The player ranks have not been set yet.");
+    uint256 totalPrizePool = (competition.players.length
+                              .mul(competition.entryFee))
+                              .sub(calculateCommission(competition));
+    for(uint256 i=0; i<competition.players.length; i++) {
+      uint256 playerPrize = competition.prizeDistribution[i]
+                              .mul(totalPrizePool)
+                              .div(100);
+      address(uint160(competition.playerRanks[i])).transfer(playerPrize);
+    }
+    competition.prizesPaid = true;
   }
 
   /**
@@ -251,12 +314,20 @@ contract PrizeDistribution is Ownable {
       "The commission has already been paid out.");
     require(competition.startBlock < block.number,
       "The competition has not started yet.");
-    uint256 commission = competition.players.length
-                          .mul(competition.entryFee)
-                          .mul(competition.commissionRate)
-                          .div(1000);
-    address(uint160(owner())).transfer(commission);
+    address(uint160(owner())).transfer(calculateCommission(competition));
     competition.commissionPaid = true;
+  }
+
+  /**
+  * @dev Calculates the commission charged on a competition prize pool.
+  */
+  function calculateCommission(
+    Competition memory competition
+  ) internal returns(uint256) {
+    return competition.players.length
+            .mul(competition.entryFee)
+            .mul(competition.commissionRate)
+            .div(1000);
   }
 
   /**
