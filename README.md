@@ -1,5 +1,5 @@
 # Prize Distribution
-Ethereum smart contracts for decentralized distribution of prizes. 
+Ethereum smart contracts for decentralized distribution of prizes.
 
 Useful for running competitions where multiple entrants compete for a share of a prize pool.
 
@@ -12,3 +12,14 @@ Run `truffle compile` to build the contracts.
 ## Testing
 
 Run `truffle test` to run the tests.
+
+## Code Coverage
+
+Run `truffle run coverage` to run tests and measure code coverage. The HTML coverage report will be available at `coverage/index.html`.
+
+## Dependencies
+
+The following `npm` dependencies are required:
+
+* `solidity-coverage`
+* `ganache-time-traveler`
