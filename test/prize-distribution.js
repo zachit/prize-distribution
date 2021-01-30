@@ -9,12 +9,13 @@ contract("PrizeDistribution", accounts => {
   const createCompetition = async (
     blockNumber,
     startBlock,
-    endBlock
+    endBlock,
+    entryFee
   ) => {
     await this.prizeDistribution.createCompetition(
       "Vega Trading Competition",
       "GBP/USD Feb 21",
-      web3.utils.toWei("0.1"),
+      entryFee ? entryFee : web3.utils.toWei("0.1"),
       startBlock ? new BigNumber(startBlock) : new BigNumber(blockNumber + 8),
       endBlock ? new BigNumber(endBlock) : new BigNumber(blockNumber + 10)
     );
@@ -23,7 +24,7 @@ contract("PrizeDistribution", accounts => {
   before(async () => {
     this.prizeDistribution = await PrizeDistribution.new(
       new BigNumber(5),
-      new BigNumber(2)
+      new BigNumber(4)
     );
   });
 
@@ -46,6 +47,19 @@ contract("PrizeDistribution", accounts => {
       assert.equal(competition[4].toNumber(), blockNumber + 8);
       assert.equal(competition[5].toNumber(), blockNumber + 10);
       assert.equal(competition[6], false);
+    }
+  );
+
+  it("should not create competition with entry fee of zero",
+    async () => {
+      try {
+        const blockNumber = await web3.eth.getBlockNumber();
+        await createCompetition(blockNumber, null, null, web3.utils.toWei("0"));
+        assert.fail();
+      } catch(e) {
+        assert.equal(_.includes(JSON.stringify(e),
+          "There must be a fee to enter the competition."), true);
+      }
     }
   );
 
@@ -181,18 +195,30 @@ contract("PrizeDistribution", accounts => {
 
   it("should not allow player to enter competition when full",
     async() => {
-      await this.prizeDistribution.enterCompetition(2, {
+      const blockNumber = await web3.eth.getBlockNumber();
+      createCompetition(blockNumber, blockNumber + 8, blockNumber + 12);
+      const count = await this.prizeDistribution.getCompetitionCount();
+      const competitionId = count.toNumber() - 1;
+      await this.prizeDistribution.enterCompetition(competitionId, {
         from: accounts[1],
         value: web3.utils.toWei("0.1")
       });
-      await this.prizeDistribution.enterCompetition(2, {
+      await this.prizeDistribution.enterCompetition(competitionId, {
         from: accounts[3],
         value: web3.utils.toWei("0.1")
       });
-      const competition = await this.prizeDistribution.getCompetition.call(2);
-      assert.equal(competition[7].toNumber(), 2);
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[7],
+        value: web3.utils.toWei("0.1")
+      });
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[8],
+        value: web3.utils.toWei("0.1")
+      });
+      const competition = await this.prizeDistribution.getCompetition.call(competitionId);
+      assert.equal(competition[7].toNumber(), 4);
       try {
-        await this.prizeDistribution.enterCompetition(2, {
+        await this.prizeDistribution.enterCompetition(competitionId, {
           from: accounts[2],
           value: web3.utils.toWei("0.1")
         });
@@ -206,8 +232,16 @@ contract("PrizeDistribution", accounts => {
 
   it("should not allow player to enter competition more than once",
     async() => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      createCompetition(blockNumber, blockNumber + 8, blockNumber + 12);
+      const count = await this.prizeDistribution.getCompetitionCount();
+      const competitionId = count.toNumber() - 1;
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[1],
+        value: web3.utils.toWei("0.1")
+      });
       try {
-        await this.prizeDistribution.enterCompetition(2, {
+        await this.prizeDistribution.enterCompetition(competitionId, {
           from: accounts[1],
           value: web3.utils.toWei("0.1")
         });
@@ -348,15 +382,23 @@ contract("PrizeDistribution", accounts => {
   it("should submit the player ranks",
     async () => {
       const blockNumber = await web3.eth.getBlockNumber();
-      createCompetition(blockNumber, blockNumber + 3, blockNumber + 4);
+      createCompetition(blockNumber, blockNumber + 5, blockNumber + 7);
       const count = await this.prizeDistribution.getCompetitionCount();
       const competitionId = count.toNumber() - 1;
       await this.prizeDistribution.enterCompetition(competitionId, {
         from: accounts[0],
         value: web3.utils.toWei("0.1")
       });
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[1],
+        value: web3.utils.toWei("0.1")
+      });
+      await this.prizeDistribution.enterCompetition(competitionId, {
+        from: accounts[2],
+        value: web3.utils.toWei("0.1")
+      });
       let competition = await this.prizeDistribution.getCompetition.call(competitionId);
-      assert.equal(competition[7].toNumber(), 1);
+      assert.equal(competition[7].toNumber(), 3);
       try {
         await this.prizeDistribution.submitPlayersByRank(competitionId, [], {
           from: accounts[0]
@@ -367,7 +409,7 @@ contract("PrizeDistribution", accounts => {
           "You must submit ranks for every player in the competition."), true);
       }
       try {
-        await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[0]], {
+        await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[0], accounts[1], accounts[2]], {
           from: accounts[0]
         });
         assert.fail();
@@ -378,7 +420,7 @@ contract("PrizeDistribution", accounts => {
       await timeMachine.advanceTimeAndBlock(60);
       await timeMachine.advanceTimeAndBlock(60);
       try {
-        await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[1]], {
+        await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[0], accounts[1], accounts[3]], {
           from: accounts[0]
         });
         assert.fail();
@@ -386,9 +428,14 @@ contract("PrizeDistribution", accounts => {
         assert.equal(_.includes(JSON.stringify(e),
           "You submitted a player that has not entered the competition."), true);
       }
-      await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[0]], {
+      await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[0], accounts[1], accounts[2]], {
         from: accounts[0]
       });
+      const distribution = await this.prizeDistribution.getPrizeDistribution(competitionId);
+      assert.equal(distribution.length, 3);
+      assert.equal(web3.utils.fromWei(distribution[0]), 0.3 * 0.995 * 0.25);
+      assert.equal(web3.utils.fromWei(distribution[1]), 0.3 * 0.995 * 0.25);
+      assert.equal(web3.utils.fromWei(distribution[2]), 0.3 * 0.995 * 0.5);
     }
   );
 

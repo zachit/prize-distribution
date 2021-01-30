@@ -203,14 +203,18 @@ contract PrizeDistribution is Ownable {
   function buildDistribution(
     uint256 _playerCount,
     uint256 _entryFee,
-    uint256 _stakeToPrizeRatio
+    uint256 _stakeToPrizeRatio,
+    uint256 _competitionId
   ) internal returns (uint256[] memory) {
     uint256[] memory prizeModel = buildFibPrizeModel(_playerCount);
     uint256[] memory distributions = new uint[](_playerCount);
+    uint256 prizePool = getPrizePoolLessCommission(_competitionId);
     for (uint256 i=0; i<prizeModel.length; i++) {
-      uint256 prize = (1 - _stakeToPrizeRatio) * prizeModel[i];
-      uint256 distribution = (_stakeToPrizeRatio + prize) * _entryFee;
-      distributions[i] = distribution;
+      uint256 prize = prizePool.mul(prizeModel[i]).div(100);
+      // TODO - fix this so that it works with stakeToPrizeRatio
+      // uint256 prize = (uint256(100).sub(_stakeToPrizeRatio)).mul(prizeModel[i]);
+      // distributions[i] = (_stakeToPrizeRatio.add(prize)).mul(_entryFee);
+      distributions[i] = prize;
     }
     return distributions;
   }
@@ -219,20 +223,18 @@ contract PrizeDistribution is Ownable {
     uint256 _playerCount
   ) internal returns (uint256[] memory) {
     uint256[] memory fib = new uint[](_playerCount);
+    uint256 skew = 5;
     for (uint256 i=0; i<_playerCount; i++) {
-      if (fib.length == 0) {
-        fib[i] = 1 - 1 / _playerCount;
-      } else if (fib.length == 1) {
+      if (i <= 1) {
         fib[i] = 1;
       } else {
-        // as "5" increases, more winnings go towards the top quartile
-        uint256 nextFib = fib[i-1] * 5 / _playerCount + fib[i-2];
-        fib[i] = nextFib;
+        // as skew increases, more winnings go towards the top quartile
+        fib[i] = ((fib[i.sub(1)].mul(skew)).div(_playerCount)).add(fib[i.sub(2)]);
       }
     }
     uint256 fibSum = getArraySum(fib);
     for (uint256 i=0; i<fib.length; i++) {
-      fib[i] = fib[i].div(fibSum).div(fib.length);
+      fib[i] = (fib[i].mul(100)).div(fibSum);
     }
     return fib;
   }
@@ -268,13 +270,24 @@ contract PrizeDistribution is Ownable {
     competition.prizeDistribution = buildDistribution(
       competition.players.length,
       competition.entryFee,
-      competition.stakeToPrizeRatio
+      competition.stakeToPrizeRatio,
+      _competitionId
     );
     for(uint i=0; i<_players.length; i++) {
       require(competition.deposits[_players[i]] > 0,
         "You submitted a player that has not entered the competition.");
       competitions[_competitionId].playerRanks.push(_players[i]);
     }
+  }
+
+  /**
+   * @dev Returns the prize distribution for a given competition
+   */
+  function getPrizeDistribution(
+    uint256 _competitionId
+  ) public competitionExists(_competitionId) view returns(uint256[] memory) {
+    Competition storage competition = competitions[_competitionId];
+    return competition.prizeDistribution;
   }
 
   /**
@@ -291,9 +304,7 @@ contract PrizeDistribution is Ownable {
     require(!competition.prizesPaid, "The prizes have already been paid.");
     require(competition.playerRanks.length > 0,
       "The player ranks have not been set yet.");
-    uint256 totalPrizePool = (competition.players.length
-                              .mul(competition.entryFee))
-                              .sub(calculateCommission(competition));
+    uint256 totalPrizePool = getPrizePoolLessCommission(_competitionId);
     for(uint256 i=0; i<competition.players.length; i++) {
       uint256 playerPrize = competition.prizeDistribution[i]
                               .mul(totalPrizePool)
@@ -301,6 +312,16 @@ contract PrizeDistribution is Ownable {
       address(uint160(competition.playerRanks[i])).transfer(playerPrize);
     }
     competition.prizesPaid = true;
+  }
+
+  function getPrizePoolLessCommission(
+    uint256 _competitionId
+  ) public competitionExists(_competitionId) view returns(uint256) {
+    Competition storage competition = competitions[_competitionId];
+    uint256 totalPrizePool = (competition.players.length
+                              .mul(competition.entryFee))
+                              .sub(getCommission(_competitionId));
+    return totalPrizePool;
   }
 
   /**
@@ -314,16 +335,17 @@ contract PrizeDistribution is Ownable {
       "The commission has already been paid out.");
     require(competition.startBlock < block.number,
       "The competition has not started yet.");
-    address(uint160(owner())).transfer(calculateCommission(competition));
+    address(uint160(owner())).transfer(getCommission(_competitionId));
     competition.commissionPaid = true;
   }
 
   /**
   * @dev Calculates the commission charged on a competition prize pool.
   */
-  function calculateCommission(
-    Competition memory competition
-  ) internal returns(uint256) {
+  function getCommission(
+    uint256 _competitionId
+  ) public competitionExists(_competitionId) view returns(uint256) {
+    Competition storage competition = competitions[_competitionId];
     return competition.players.length
             .mul(competition.entryFee)
             .mul(competition.commissionRate)
