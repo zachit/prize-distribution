@@ -3,6 +3,13 @@ pragma solidity >=0.4.22 <0.9.0;
 import "./lib/SafeMath.sol";
 import "./lib/Ownable.sol";
 
+/*
+* TODO:
+* We should allow pseudonomous users to provide backing for
+* competitions by guaranteeing prize pools.
+* They will earn a commission for doing this.
+*/
+
 contract PrizeDistribution is Ownable {
 
   using SafeMath for uint256;
@@ -200,28 +207,34 @@ contract PrizeDistribution is Ownable {
     competitions[_competitionId].deposits[_player] = 0;
   }
 
+  /**
+  * @dev Builds the prize distribution for a competition
+  */
   function buildDistribution(
     uint256 _playerCount,
-    uint256 _entryFee,
     uint256 _stakeToPrizeRatio,
     uint256 _competitionId
-  ) internal returns (uint256[] memory) {
+  ) internal view returns (uint256[] memory) {
     uint256[] memory prizeModel = buildFibPrizeModel(_playerCount);
     uint256[] memory distributions = new uint[](_playerCount);
     uint256 prizePool = getPrizePoolLessCommission(_competitionId);
     for (uint256 i=0; i<prizeModel.length; i++) {
-      uint256 prize = prizePool.mul(prizeModel[i]).div(100);
-      // TODO - fix this so that it works with stakeToPrizeRatio
-      // uint256 prize = (uint256(100).sub(_stakeToPrizeRatio)).mul(prizeModel[i]);
-      // distributions[i] = (_stakeToPrizeRatio.add(prize)).mul(_entryFee);
+      uint256 constantPool = prizePool.mul(_stakeToPrizeRatio).div(100);
+      uint256 variablePool = prizePool.sub(constantPool);
+      uint256 constantPart = constantPool.div(_playerCount);
+      uint256 variablePart = variablePool.mul(prizeModel[i]).div(100);
+      uint256 prize = constantPart.add(variablePart);
       distributions[i] = prize;
     }
     return distributions;
   }
 
+  /**
+  * @dev Builds the Fibonacci distribution used to allocate prizes
+  */
   function buildFibPrizeModel(
     uint256 _playerCount
-  ) internal returns (uint256[] memory) {
+  ) internal pure returns (uint256[] memory) {
     uint256[] memory fib = new uint[](_playerCount);
     uint256 skew = 5;
     for (uint256 i=0; i<_playerCount; i++) {
@@ -239,9 +252,12 @@ contract PrizeDistribution is Ownable {
     return fib;
   }
 
+  /**
+  * @dev Utility function to sum an array of uint256
+  */
   function getArraySum(
     uint256[] memory _array
-  ) internal returns (uint256) {
+  ) internal pure returns (uint256) {
     uint256 sum = 0;
     for (uint256 i=0; i<_array.length; i++) {
       sum = sum.add(_array[i]);
@@ -269,7 +285,6 @@ contract PrizeDistribution is Ownable {
     competitions[_competitionId].playerRanks.length = 0;
     competition.prizeDistribution = buildDistribution(
       competition.players.length,
-      competition.entryFee,
       competition.stakeToPrizeRatio,
       _competitionId
     );

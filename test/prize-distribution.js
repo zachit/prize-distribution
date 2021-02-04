@@ -433,9 +433,12 @@ contract("PrizeDistribution", accounts => {
       });
       const distribution = await this.prizeDistribution.getPrizeDistribution(competitionId);
       assert.equal(distribution.length, 3);
-      assert.equal(web3.utils.fromWei(distribution[0]), 0.3 * 0.995 * 0.25);
-      assert.equal(web3.utils.fromWei(distribution[1]), 0.3 * 0.995 * 0.25);
-      assert.equal(web3.utils.fromWei(distribution[2]), 0.3 * 0.995 * 0.5);
+      const prizePool = 0.3 * 0.995;
+      const constantPool = prizePool * 0.5;
+      const variablePool = prizePool * 0.5;
+      assert.equal(Number(web3.utils.fromWei(distribution[0])).toFixed(5), ((variablePool * 0.25) + (constantPool / 3)).toFixed(5));
+      assert.equal(Number(web3.utils.fromWei(distribution[1])).toFixed(5), ((variablePool * 0.25) + (constantPool / 3)).toFixed(5));
+      assert.equal(Number(web3.utils.fromWei(distribution[2])).toFixed(5), ((variablePool * 0.5) + (constantPool / 3)).toFixed(5));
     }
   );
 
