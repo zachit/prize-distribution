@@ -19,7 +19,8 @@ Run `truffle run coverage` to run tests and measure code coverage. The HTML cove
 
 ## Dependencies
 
-The following `npm` dependencies are required to run the tests:
+The following `npm` dependencies are required:
 
 * `solidity-coverage`
 * `ganache-time-traveler`
+* `truffle-hdwallet-provider`
