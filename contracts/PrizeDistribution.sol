@@ -5,7 +5,7 @@ import "./lib/Ownable.sol";
 
 /*
 * TODO:
-* We should allow pseudonomous users to provide backing for
+* We should allow pseudonymous users to provide backing for
 * competitions by guaranteeing prize pools.
 * They will earn a commission for doing this.
 */
