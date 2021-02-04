@@ -458,29 +458,41 @@ contract("PrizeDistribution", accounts => {
 
   it("should withdraw prizes",
     async () => {
-      const blockNumber = await web3.eth.getBlockNumber();
-      createCompetition(blockNumber, blockNumber + 4, blockNumber + 5);
       const count = await this.prizeDistribution.getCompetitionCount();
       const competitionId = count.toNumber() - 1;
-      await this.prizeDistribution.enterCompetition(competitionId, {
-        from: accounts[1],
-        value: web3.utils.toWei("0.1")
+      const balanceBefore1 = await web3.eth.getBalance(accounts[0]);
+      const balanceBefore2 = await web3.eth.getBalance(accounts[1]);
+      const balanceBefore3 = await web3.eth.getBalance(accounts[2]);
+      await this.prizeDistribution.withdrawPrizes(competitionId, {
+        from: accounts[0]
       });
-      await this.prizeDistribution.enterCompetition(competitionId, {
-        from: accounts[2],
-        value: web3.utils.toWei("0.1")
-      });
-      let competition = await this.prizeDistribution.getCompetition.call(competitionId);
-      assert.equal(competition[7].toNumber(), 2);
-      await timeMachine.advanceTimeAndBlock(60);
-      await timeMachine.advanceTimeAndBlock(60);
-      await timeMachine.advanceTimeAndBlock(60);
-      // await this.prizeDistribution.submitPlayersByRank(competitionId, [accounts[1], accounts[2]], {
-      //   from: accounts[0]
-      // });
-      // await this.prizeDistribution.withdrawPrizes(competitionId, {
-      //   from: accounts[0]
-      // });
+      const balanceAfter1 = await web3.eth.getBalance(accounts[0]);
+      const balanceAfter2 = await web3.eth.getBalance(accounts[1]);
+      const balanceAfter3 = await web3.eth.getBalance(accounts[2]);
+      const prizePool = 0.3 * 0.995;
+      const constantPool = prizePool * 0.5;
+      const variablePool = prizePool * 0.5;
+      assert.equal(Number(web3.utils.fromWei(balanceAfter1)).toFixed(5), (Number(web3.utils.fromWei(balanceBefore1)) + (variablePool * 0.25) + (constantPool / 3)).toFixed(5));
+      assert.equal(Number(web3.utils.fromWei(balanceAfter2)).toFixed(5), (Number(web3.utils.fromWei(balanceBefore2)) + (variablePool * 0.25) + (constantPool / 3)).toFixed(5));
+      assert.equal(Number(web3.utils.fromWei(balanceAfter3)).toFixed(5), (Number(web3.utils.fromWei(balanceBefore3)) + (variablePool * 0.5) + (constantPool / 3)).toFixed(5));
+    }
+  );
+
+  it("should not withdraw prizes when ranks are not set",
+    async () => {
+      // TODO - test this
+    }
+  );
+
+  it("should not withdraw prizes when already paid",
+    async () => {
+      // TODO - test this
+    }
+  );
+
+  it("should not withdraw prizes when competition is cancelled",
+    async () => {
+      // TODO - test this
     }
   );
 });

@@ -10,6 +10,13 @@ import "./lib/Ownable.sol";
 * They will earn a commission for doing this.
 */
 
+/*
+* TODO:
+* We should add support for generic ERC20 tokens.
+* The creator of a competition can set the asset contract that should
+* be used for the prize pool / entrance fees.
+*/
+
 contract PrizeDistribution is Ownable {
 
   using SafeMath for uint256;
@@ -319,12 +326,9 @@ contract PrizeDistribution is Ownable {
     require(!competition.prizesPaid, "The prizes have already been paid.");
     require(competition.playerRanks.length > 0,
       "The player ranks have not been set yet.");
-    uint256 totalPrizePool = getPrizePoolLessCommission(_competitionId);
     for(uint256 i=0; i<competition.players.length; i++) {
-      uint256 playerPrize = competition.prizeDistribution[i]
-                              .mul(totalPrizePool)
-                              .div(100);
-      address(uint160(competition.playerRanks[i])).transfer(playerPrize);
+      address(uint160(competition.playerRanks[i]))
+        .transfer(competition.prizeDistribution[i]);
     }
     competition.prizesPaid = true;
   }
