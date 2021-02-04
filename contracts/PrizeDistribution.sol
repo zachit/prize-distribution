@@ -17,6 +17,14 @@ import "./lib/Ownable.sol";
 * be used for the prize pool / entrance fees.
 */
 
+/*
+* TODO:
+* The owner of the contract should be able to define
+* tiered commission rates, so higher % can be charged on
+* competitions with a small prize pool, and smaller on
+* large prize pools.
+*/
+
 contract PrizeDistribution is Ownable {
 
   using SafeMath for uint256;
