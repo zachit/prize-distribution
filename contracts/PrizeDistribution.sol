@@ -191,6 +191,25 @@ contract PrizeDistribution is Ownable {
   }
 
   /**
+   * @dev Users who have entered a competition may withdraw before it has begun 
+   * and have their entry fee returned.
+   */
+  function withdrawFromCompetition(
+    uint256 _competitionId
+  ) public competitionExists(_competitionId) 
+  {
+    Competition storage competition = competitions[_competitionId];
+    require(!competition.canceled,
+      "The competition has already been canceled. Your entry fee should have been returned");
+    require(competition.startBlock > block.number, 
+      "You cannot withraw from a competition after it has started.");
+    require(competition.deposits[msg.sender] > 0,
+      "The wallet you are calling this function with has not entered this competition.");
+    returnEntryFee(_competitionId, address(uint160(msg.sender)));
+  }
+
+
+  /**
    * @dev The owner of a competition can cancel it if it has not started.
    */
   function cancelCompetition(
@@ -293,6 +312,8 @@ contract PrizeDistribution is Ownable {
     address[] memory _players
   ) public competitionExists(_competitionId) onlyOwner {
     Competition storage competition = competitions[_competitionId];
+    require(!competition.canceled,
+      "This competition was canceled. You can't submit results.");
     require(_players.length == competition.players.length,
       "You must submit ranks for every player in the competition.");
     require(competition.endBlock < block.number,
